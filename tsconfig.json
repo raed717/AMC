@@ -1,0 +1,3 @@
+{
+  "extends": "@AMC/config/tsconfig.base.json"
+}
