@@ -10,7 +10,7 @@
     }
   },
   "scripts": {
-    "db:local": "turso dev --db-file local.db",
+    "db:local": "drizzle-kit push && echo 'Local database initialized'",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
@@ -27,6 +27,7 @@
   "devDependencies": {
     "@AMC/config": "*",
     "drizzle-kit": "^0.31.10",
+    "turso": "^0.1.0",
     "typescript": "^5"
   }
 }
