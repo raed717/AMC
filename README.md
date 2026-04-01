@@ -14,6 +14,31 @@ This project was created with [Better Fullstack](https://github.com/Marve10s/Bet
 - **Authentication** - Better Auth
 - **Turborepo** - Optimized monorepo build system
 
+## Application Features
+
+### Patient Portal
+- View personal information (name, email, phone, gender, birthday)
+- Unique QR code for medical ID
+- Download QR code or copy patient ID
+
+### Doctor Dashboard
+- QR code scanner to quickly access patient records
+- Manual patient ID entry option
+
+### Patient Management
+- View patient personal information
+- Add new medical visits with diagnosis and notes
+- View medical visit history with doctor info and timestamps
+- Manage medications (add, view, delete)
+- Predefined medication frequencies (once daily, twice daily, etc.)
+- Morning and night dose tracking
+
+### Database Schema
+- `medical_visits` - Patient visits with notes and diagnosis
+- `medications` - Patient medications with dosage and frequency
+- `visit_medications` - Link between visits and medications
+- User phone number field
+
 ## Getting Started
 
 First, install the dependencies:

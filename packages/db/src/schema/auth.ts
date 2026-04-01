@@ -11,6 +11,7 @@ export const user = sqliteTable("user", {
   birthday: text("birthday"),
   gender: text("gender"),
   specialization: text("specialization"),
+  phone: text("phone"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
     .notNull(),
@@ -18,6 +19,60 @@ export const user = sqliteTable("user", {
     .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
+});
+
+export const medicalVisits = sqliteTable("medical_visits", {
+  id: text("id").primaryKey(),
+  patientId: text("patient_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  doctorId: text("doctor_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  visitDate: integer("visit_date", { mode: "timestamp_ms" }).notNull(),
+  notes: text("notes"),
+  diagnosis: text("diagnosis"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const medications = sqliteTable("medications", {
+  id: text("id").primaryKey(),
+  patientId: text("patient_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  dosage: text("dosage"),
+  frequency: text("frequency").notNull(),
+  timesPerDay: integer("times_per_day").default(2),
+  morningDose: text("morning_dose"),
+  nightDose: text("night_dose"),
+  startDate: integer("start_date", { mode: "timestamp_ms" }),
+  endDate: integer("end_date", { mode: "timestamp_ms" }),
+  isActive: integer("is_active", { mode: "boolean" }).default(true),
+  notes: text("notes"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const visitMedications = sqliteTable("visit_medications", {
+  id: text("id").primaryKey(),
+  visitId: text("visit_id")
+    .notNull()
+    .references(() => medicalVisits.id, { onDelete: "cascade" }),
+  medicationId: text("medication_id")
+    .notNull()
+    .references(() => medications.id, { onDelete: "cascade" }),
 });
 
 export const session = sqliteTable(
@@ -92,6 +147,8 @@ export const verification = sqliteTable(
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  patientVisits: many(medicalVisits),
+  medications: many(medications),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -105,5 +162,38 @@ export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
     fields: [account.userId],
     references: [user.id],
+  }),
+}));
+
+export const medicalVisitsRelations = relations(medicalVisits, ({ one, many }) => ({
+  patient: one(user, {
+    fields: [medicalVisits.patientId],
+    references: [user.id],
+    relationName: "patient",
+  }),
+  doctor: one(user, {
+    fields: [medicalVisits.doctorId],
+    references: [user.id],
+    relationName: "doctor",
+  }),
+  visitMedications: many(visitMedications),
+}));
+
+export const medicationsRelations = relations(medications, ({ one, many }) => ({
+  patient: one(user, {
+    fields: [medications.patientId],
+    references: [user.id],
+  }),
+  visitMedications: many(visitMedications),
+}));
+
+export const visitMedicationsRelations = relations(visitMedications, ({ one }) => ({
+  visit: one(medicalVisits, {
+    fields: [visitMedications.visitId],
+    references: [medicalVisits.id],
+  }),
+  medication: one(medications, {
+    fields: [visitMedications.medicationId],
+    references: [medications.id],
   }),
 }));

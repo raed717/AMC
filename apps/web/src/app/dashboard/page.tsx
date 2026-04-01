@@ -2,8 +2,6 @@ import { auth } from "@AMC/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { authClient } from "@/lib/auth-client";
-
 import Dashboard from "./dashboard";
 
 export default async function DashboardPage() {
@@ -15,11 +13,8 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>Welcome {session.user.name}</p>
-      <Dashboard session={session} />
-    </div>
-  );
+  const user = session.user;
+  const role = (user as any).role as string | undefined;
+
+  return <Dashboard role={role} />;
 }
