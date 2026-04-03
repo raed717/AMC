@@ -41,14 +41,18 @@ export default function PatientPage({
   const patientId = decodeURIComponent(id);
   const queryClient = useQueryClient();
 
+  const patientQueryOptions = trpc.patient.getPatient.queryOptions({ patientId });
+  const visitsQueryOptions = trpc.patient.getPatientVisits.queryOptions({ patientId });
+  const medicationsQueryOptions = trpc.patient.getPatientMedications.queryOptions({ patientId });
+
   const { data: patient, isLoading: loadingPatient } = useQuery(
-    trpc.patient.getPatient.queryOptions({ patientId }),
+    patientQueryOptions,
   );
   const { data: visits, isLoading: loadingVisits } = useQuery(
-    trpc.patient.getPatientVisits.queryOptions({ patientId }),
+    visitsQueryOptions,
   );
   const { data: medications, isLoading: loadingMeds } = useQuery(
-    trpc.patient.getPatientMedications.queryOptions({ patientId }),
+    medicationsQueryOptions,
   );
 
   const createVisitMutation = useMutation({
@@ -59,9 +63,12 @@ export default function PatientPage({
     }) => {
       return trpcClient.patient.createVisit.mutate(data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["patient.getPatientVisits"],
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: visitsQueryOptions.queryKey,
+      });
+      await queryClient.refetchQueries({
+        queryKey: visitsQueryOptions.queryKey,
       });
       toast.success("Visit saved successfully");
     },
@@ -83,9 +90,12 @@ export default function PatientPage({
     }) => {
       return trpcClient.patient.createMedication.mutate(data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["patient.getPatientMedications"],
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: medicationsQueryOptions.queryKey,
+      });
+      await queryClient.refetchQueries({
+        queryKey: medicationsQueryOptions.queryKey,
       });
       toast.success("Medication added successfully");
     },
@@ -98,14 +108,39 @@ export default function PatientPage({
     mutationFn: async (data: { id: string }) => {
       return trpcClient.patient.deleteMedication.mutate(data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["patient.getPatientMedications"],
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: medicationsQueryOptions.queryKey });
+
+      const previousMedications = queryClient.getQueryData<any[]>(
+        medicationsQueryOptions.queryKey,
+      );
+
+      queryClient.setQueryData<any[]>(
+        medicationsQueryOptions.queryKey,
+        (old) => old?.filter((med) => med.id !== id) ?? [],
+      );
+
+      return { previousMedications };
+    },
+    onError: (error: any, _variables, context) => {
+      if (context?.previousMedications) {
+        queryClient.setQueryData(
+          medicationsQueryOptions.queryKey,
+          context.previousMedications,
+        );
+      }
+      toast.error(error.message);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: medicationsQueryOptions.queryKey,
       });
       toast.success("Medication removed");
     },
-    onError: (error: any) => {
-      toast.error(error.message);
+    onSettled: async () => {
+      await queryClient.refetchQueries({
+        queryKey: medicationsQueryOptions.queryKey,
+      });
     },
   });
 
