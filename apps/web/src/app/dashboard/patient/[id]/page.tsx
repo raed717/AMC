@@ -41,16 +41,19 @@ export default function PatientPage({
   const patientId = decodeURIComponent(id);
   const queryClient = useQueryClient();
 
-  const patientQueryOptions = trpc.patient.getPatient.queryOptions({ patientId });
-  const visitsQueryOptions = trpc.patient.getPatientVisits.queryOptions({ patientId });
-  const medicationsQueryOptions = trpc.patient.getPatientMedications.queryOptions({ patientId });
+  const patientQueryOptions = trpc.patient.getPatient.queryOptions({
+    patientId,
+  });
+  const visitsQueryOptions = trpc.patient.getPatientVisits.queryOptions({
+    patientId,
+  });
+  const medicationsQueryOptions =
+    trpc.patient.getPatientMedications.queryOptions({ patientId });
 
-  const { data: patient, isLoading: loadingPatient } = useQuery(
-    patientQueryOptions,
-  );
-  const { data: visits, isLoading: loadingVisits } = useQuery(
-    visitsQueryOptions,
-  );
+  const { data: patient, isLoading: loadingPatient } =
+    useQuery(patientQueryOptions);
+  const { data: visits, isLoading: loadingVisits } =
+    useQuery(visitsQueryOptions);
   const { data: medications, isLoading: loadingMeds } = useQuery(
     medicationsQueryOptions,
   );
@@ -109,7 +112,9 @@ export default function PatientPage({
       return trpcClient.patient.deleteMedication.mutate(data);
     },
     onMutate: async ({ id }) => {
-      await queryClient.cancelQueries({ queryKey: medicationsQueryOptions.queryKey });
+      await queryClient.cancelQueries({
+        queryKey: medicationsQueryOptions.queryKey,
+      });
 
       const previousMedications = queryClient.getQueryData<any[]>(
         medicationsQueryOptions.queryKey,
