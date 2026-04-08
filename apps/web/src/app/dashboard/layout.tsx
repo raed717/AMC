@@ -18,7 +18,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#020617]">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <DashboardNavbar />
       <main className="container mx-auto px-4 py-8">
         {children}

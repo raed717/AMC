@@ -25,39 +25,39 @@ export default function DashboardPage({ role }: DashboardPageProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-100">Dashboard</h1>
-        <p className="text-slate-400">Welcome back, {user.name}</p>
+        <h1 className="text-3xl font-bold text-card-foreground">Dashboard</h1>
+        <p className="text-muted-foreground">Welcome back, {user.name}</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-6">
-          <Card className="bg-slate-900/50 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center gap-2">
-              <User className="h-5 w-5 text-teal-500" />
-              <CardTitle className="text-slate-200 text-lg">Name</CardTitle>
+              <User className="h-5 w-5 text-emerald-500" />
+              <CardTitle className="text-card-foreground text-lg">Name</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-slate-300">{user.name}</p>
+              <p className="text-foreground">{user.name}</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center gap-2">
-              <Mail className="h-5 w-5 text-teal-500" />
-              <CardTitle className="text-slate-200 text-lg">Email</CardTitle>
+              <Mail className="h-5 w-5 text-emerald-500" />
+              <CardTitle className="text-card-foreground text-lg">Email</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-slate-300">{user.email}</p>
+              <p className="text-foreground">{user.email}</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center gap-2">
-              <Shield className="h-5 w-5 text-teal-500" />
-              <CardTitle className="text-slate-200 text-lg">Role</CardTitle>
+              <Shield className="h-5 w-5 text-emerald-500" />
+              <CardTitle className="text-card-foreground text-lg">Role</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-slate-300 capitalize">{userRole}</p>
+              <p className="text-foreground capitalize">{userRole}</p>
             </CardContent>
           </Card>
         </div>
@@ -72,13 +72,13 @@ export default function DashboardPage({ role }: DashboardPageProps) {
       </div>
 
       {privateData.data && (
-        <Card className="bg-slate-900/50 border-slate-800">
+        <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center gap-2">
-            <Activity className="h-5 w-5 text-teal-500" />
-            <CardTitle className="text-slate-200">API Status</CardTitle>
+            <Activity className="h-5 w-5 text-emerald-500" />
+            <CardTitle className="text-card-foreground">API Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-teal-400">{privateData.data.message}</p>
+            <p className="text-emerald-400">{privateData.data.message}</p>
           </CardContent>
         </Card>
       )}

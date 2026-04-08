@@ -243,7 +243,7 @@ export default function PatientPage({
     // Header / Logo
     doc.setFont("helvetica", "bold");
     doc.setFontSize(24);
-    doc.setTextColor(20, 184, 166); // Teal-500
+    doc.setTextColor(16, 185, 129); // Emerald-500
     doc.text("AMC", 14, 20);
     
     doc.setFont("helvetica", "normal");
@@ -300,7 +300,7 @@ export default function PatientPage({
           ].filter(Boolean).join("\n") || "-"
         ]),
         theme: "striped",
-        headStyles: { fillColor: [20, 184, 166] }, // Teal-500
+        headStyles: { fillColor: [16, 185, 129] }, // Emerald-500
         styles: { fontSize: 10, cellPadding: 4 },
       });
     } else {
@@ -384,7 +384,7 @@ export default function PatientPage({
   if (loadingPatient) {
     return (
       <div className="flex items-center justify-center min-h-100">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
       </div>
     );
   }
@@ -393,7 +393,7 @@ export default function PatientPage({
     return (
       <div className="flex flex-col items-center justify-center min-h-100 space-y-4">
         <AlertCircle className="w-12 h-12 text-red-500" />
-        <p className="text-slate-400">Patient not found</p>
+        <p className="text-muted-foreground">Patient not found</p>
       </div>
     );
   }
@@ -402,12 +402,12 @@ export default function PatientPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-100">Patient Records</h1>
-          <p className="text-slate-400">Managing records for {patient.name}</p>
+          <h1 className="text-3xl font-bold text-card-foreground">Patient Records</h1>
+          <p className="text-muted-foreground">Managing records for {patient.name}</p>
         </div>
         <div className="flex gap-2">
           <Button
-            className="bg-teal-600 hover:bg-teal-500"
+            className="bg-emerald-600 hover:bg-emerald-500"
             onClick={() => setShowVisitDialog(true)}
           >
             <Stethoscope className="w-4 h-4 mr-2" />
@@ -421,28 +421,28 @@ export default function PatientPage({
               </DialogHeader>
               <form onSubmit={handleCreateVisit} className="space-y-4">
                 <div>
-                  <label className="text-sm text-slate-400">Diagnosis</label>
+                  <label className="text-sm text-muted-foreground">Diagnosis</label>
                   <Input
                     value={visitDiagnosis}
                     onChange={(e) => setVisitDiagnosis(e.target.value)}
                     placeholder="Enter diagnosis"
-                    className="bg-slate-800 border-slate-700 text-slate-200"
+                    className="bg-muted border-border text-card-foreground"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-400">Notes</label>
+                  <label className="text-sm text-muted-foreground">Notes</label>
                   <Textarea
                     value={visitNotes}
                     onChange={(e) => setVisitNotes(e.target.value)}
                     placeholder="Enter visit notes"
                     rows={4}
-                    className="bg-slate-800 border-slate-700 text-slate-200"
+                    className="bg-muted border-border text-card-foreground"
                   />
                 </div>
                 <Button
                   type="submit"
                   disabled={createVisitMutation.isPending}
-                  className="w-full bg-teal-600 hover:bg-teal-500"
+                  className="w-full bg-emerald-600 hover:bg-emerald-500"
                 >
                   {createVisitMutation.isPending ? "Saving..." : "Save Visit"}
                 </Button>
@@ -451,7 +451,7 @@ export default function PatientPage({
           </Dialog>
 
           <Button
-            className="bg-indigo-600 hover:bg-indigo-500"
+            className="bg-teal-600 hover:bg-teal-500"
             onClick={() => setShowMedDialog(true)}
           >
             <Pill className="w-4 h-4 mr-2" />
@@ -517,31 +517,31 @@ export default function PatientPage({
               </DialogHeader>
               <form onSubmit={handleCreateMedication} className="space-y-4">
                 <div>
-                  <label className="text-sm text-slate-400">
+                  <label className="text-sm text-muted-foreground">
                     Medication Name *
                   </label>
                   <Input
                     value={medName}
                     onChange={(e) => setMedName(e.target.value)}
                     placeholder="Enter medication name"
-                    className="bg-slate-800 border-slate-700 text-slate-200"
+                    className="bg-muted border-border text-card-foreground"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-400">Dosage</label>
+                  <label className="text-sm text-muted-foreground">Dosage</label>
                   <Input
                     value={medDosage}
                     onChange={(e) => setMedDosage(e.target.value)}
                     placeholder="e.g., 500mg"
-                    className="bg-slate-800 border-slate-700 text-slate-200"
+                    className="bg-muted border-border text-card-foreground"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-400">Frequency</label>
+                  <label className="text-sm text-muted-foreground">Frequency</label>
                   <select
                     value={medFrequency}
                     onChange={(e) => setMedFrequency(e.target.value)}
-                    className="w-full bg-slate-800 border-slate-700 rounded-md px-3 py-2 text-slate-200"
+                    className="w-full bg-muted border-border rounded-md px-3 py-2 text-card-foreground"
                   >
                     {FREQUENCIES.map((f) => (
                       <option key={f.value} value={f.value}>
@@ -552,40 +552,40 @@ export default function PatientPage({
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm text-slate-400">
+                    <label className="text-sm text-muted-foreground">
                       Morning Dose
                     </label>
                     <Input
                       value={medMorningDose}
                       onChange={(e) => setMedMorningDose(e.target.value)}
                       placeholder="e.g., 1 pill"
-                      className="bg-slate-800 border-slate-700 text-slate-200"
+                      className="bg-muted border-border text-card-foreground"
                     />
                   </div>
                   <div>
-                    <label className="text-sm text-slate-400">Night Dose</label>
+                    <label className="text-sm text-muted-foreground">Night Dose</label>
                     <Input
                       value={medNightDose}
                       onChange={(e) => setMedNightDose(e.target.value)}
                       placeholder="e.g., 1 pill"
-                      className="bg-slate-800 border-slate-700 text-slate-200"
+                      className="bg-muted border-border text-card-foreground"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm text-slate-400">Notes</label>
+                  <label className="text-sm text-muted-foreground">Notes</label>
                   <Textarea
                     value={medNotes}
                     onChange={(e) => setMedNotes(e.target.value)}
                     placeholder="Additional notes"
                     rows={2}
-                    className="bg-slate-800 border-slate-700 text-slate-200"
+                    className="bg-muted border-border text-card-foreground"
                   />
                 </div>
                 <Button
                   type="submit"
                   disabled={createMedMutation.isPending || !medName}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500"
+                  className="w-full bg-teal-600 hover:bg-teal-500"
                 >
                   {createMedMutation.isPending ? "Saving..." : "Add Medication"}
                 </Button>
@@ -597,50 +597,50 @@ export default function PatientPage({
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1">
-          <Card className="bg-slate-900/50 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-slate-200 flex items-center gap-2">
-                <User className="w-5 h-5 text-teal-500" />
+              <CardTitle className="text-card-foreground flex items-center gap-2">
+                <User className="w-5 h-5 text-emerald-500" />
                 Personal Information
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="text-sm text-slate-500">Full Name</label>
-                <p className="text-slate-200 font-medium">{patient.name}</p>
+                <label className="text-sm text-muted-foreground">Full Name</label>
+                <p className="text-card-foreground font-medium">{patient.name}</p>
               </div>
               <div>
-                <label className="text-sm text-slate-500">Email</label>
-                <p className="text-slate-200">{patient.email}</p>
+                <label className="text-sm text-muted-foreground">Email</label>
+                <p className="text-card-foreground">{patient.email}</p>
               </div>
               <div>
-                <label className="text-sm text-slate-500">Phone</label>
-                <p className="text-slate-200">
+                <label className="text-sm text-muted-foreground">Phone</label>
+                <p className="text-card-foreground">
                   {patient.phone || "Not provided"}
                 </p>
               </div>
               <div>
-                <label className="text-sm text-slate-500">Gender</label>
-                <p className="text-slate-200 capitalize">
+                <label className="text-sm text-muted-foreground">Gender</label>
+                <p className="text-card-foreground capitalize">
                   {patient.gender || "Not provided"}
                 </p>
               </div>
               <div>
-                <label className="text-sm text-slate-500">Birthday</label>
-                <p className="text-slate-200">
+                <label className="text-sm text-muted-foreground">Birthday</label>
+                <p className="text-card-foreground">
                   {patient.birthday || "Not provided"}
                 </p>
               </div>
               <div>
-                <label className="text-sm text-slate-500">Patient ID</label>
-                <p className="text-slate-200 font-mono text-xs">{patient.id}</p>
+                <label className="text-sm text-muted-foreground">Patient ID</label>
+                <p className="text-card-foreground font-mono text-xs">{patient.id}</p>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-800 mt-6">
+          <Card className="bg-card border-border mt-6">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-slate-200 flex items-center gap-2">
+              <CardTitle className="text-card-foreground flex items-center gap-2">
                 <Activity className="w-5 h-5 text-rose-500" />
                 Chronic Diseases
               </CardTitle>
@@ -648,7 +648,7 @@ export default function PatientPage({
                 variant="ghost"
                 size="icon"
                 onClick={openDiseasesDialog}
-                className="text-slate-400 hover:text-teal-400"
+                className="text-muted-foreground hover:text-emerald-400"
               >
                 <Edit3 className="w-4 h-4" />
               </Button>
@@ -667,7 +667,7 @@ export default function PatientPage({
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-6 text-slate-500">
+                <div className="text-center py-6 text-muted-foreground">
                   <Activity className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No chronic diseases recorded</p>
                 </div>
@@ -689,22 +689,22 @@ export default function PatientPage({
                         key={disease}
                         className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                           isSelected
-                            ? "bg-teal-500/10 border-teal-500/50"
-                            : "bg-slate-800/50 border-slate-700 hover:bg-slate-800"
+                            ? "bg-emerald-500/10 border-emerald-500/50"
+                            : "bg-muted border-border hover:bg-muted"
                         }`}
                       >
                         <div
                           className={`flex items-center justify-center w-5 h-5 rounded border ${
                             isSelected
-                              ? "bg-teal-500 border-teal-500"
-                              : "border-slate-500 bg-slate-900"
+                              ? "bg-emerald-500 border-emerald-500"
+                              : "border-border bg-card"
                           }`}
                         >
-                          {isSelected && <CheckSquare className="w-3.5 h-3.5 text-white" />}
+                          {isSelected && <CheckSquare className="w-3.5 h-3.5 text-foreground" />}
                         </div>
                         <span
                           className={`text-sm ${
-                            isSelected ? "text-slate-200" : "text-slate-400"
+                            isSelected ? "text-card-foreground" : "text-muted-foreground"
                           }`}
                         >
                           {disease}
@@ -730,7 +730,7 @@ export default function PatientPage({
                 <Button
                   type="submit"
                   disabled={updateDiseasesMutation.isPending}
-                  className="w-full bg-teal-600 hover:bg-teal-500 mt-4"
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 mt-4"
                 >
                   {updateDiseasesMutation.isPending ? "Saving..." : "Save Diseases"}
                 </Button>
@@ -740,14 +740,14 @@ export default function PatientPage({
         </div>
 
         <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-slate-900/50 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-slate-200 flex items-center gap-2">
-                <Pill className="w-5 h-5 text-teal-500" />
+              <CardTitle className="text-card-foreground flex items-center gap-2">
+                <Pill className="w-5 h-5 text-emerald-500" />
                 Current Medications
                 <Badge
                   variant="secondary"
-                  className="ml-2 bg-teal-500/20 text-teal-400"
+                  className="ml-2 bg-emerald-500/20 text-emerald-400"
                 >
                   {medications?.filter((m: any) => m.isActive).length || 0}{" "}
                   active
@@ -757,7 +757,7 @@ export default function PatientPage({
                 variant="outline"
                 size="sm"
                 onClick={handleDownloadPrescription}
-                className="ml-auto border-slate-700 text-slate-300 hover:text-slate-100 hover:bg-slate-800"
+                className="ml-auto border-border text-foreground hover:text-card-foreground hover:bg-muted"
               >
                 <Printer className="w-4 h-4 mr-2" />
                 Download PDF
@@ -767,7 +767,7 @@ export default function PatientPage({
               {loadingMeds ? (
                 <div className="animate-pulse space-y-3">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-16 bg-slate-800 rounded-lg" />
+                    <div key={i} className="h-16 bg-muted rounded-lg" />
                   ))}
                 </div>
               ) : medications && medications.length > 0 ? (
@@ -775,27 +775,27 @@ export default function PatientPage({
                   {medications.map((med: any) => (
                     <div
                       key={med.id}
-                      className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700/50"
+                      className="flex items-center justify-between p-4 bg-muted rounded-lg border border-border"
                     >
                       <div className="flex items-center gap-4">
                         <div
-                          className={`p-2 rounded-lg ${med.isActive ? "bg-teal-500/20" : "bg-slate-700"}`}
+                          className={`p-2 rounded-lg ${med.isActive ? "bg-emerald-500/20" : "bg-muted-foreground/20"}`}
                         >
                           <Pill
-                            className={`w-5 h-5 ${med.isActive ? "text-teal-400" : "text-slate-500"}`}
+                            className={`w-5 h-5 ${med.isActive ? "text-emerald-400" : "text-muted-foreground"}`}
                           />
                         </div>
                         <div>
-                          <p className="text-slate-200 font-medium">
+                          <p className="text-card-foreground font-medium">
                             {med.name}
                           </p>
-                          <div className="flex items-center gap-2 text-sm text-slate-400">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             {med.dosage && <span>{med.dosage}</span>}
                             <span>•</span>
                             <span>{getFrequencyLabel(med.frequency)}</span>
                           </div>
                           {(med.morningDose || med.nightDose) && (
-                            <div className="flex gap-3 text-xs text-slate-500 mt-1">
+                            <div className="flex gap-3 text-xs text-muted-foreground mt-1">
                               {med.morningDose && (
                                 <span>Morning: {med.morningDose}</span>
                               )}
@@ -809,7 +809,7 @@ export default function PatientPage({
                       <div className="flex items-center gap-2">
                         <Badge
                           variant={med.isActive ? "default" : "secondary"}
-                          className={med.isActive ? "bg-teal-500" : ""}
+                          className={med.isActive ? "bg-emerald-500" : ""}
                         >
                           {med.isActive ? "Active" : "Inactive"}
                         </Badge>
@@ -819,7 +819,7 @@ export default function PatientPage({
                           onClick={() =>
                             deleteMedMutation.mutate({ id: med.id })
                           }
-                          className="text-slate-400 hover:text-red-400"
+                          className="text-muted-foreground hover:text-red-400"
                         >
                           <X className="w-4 h-4" />
                         </Button>
@@ -828,7 +828,7 @@ export default function PatientPage({
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-8 text-muted-foreground">
                   <Pill className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p>No medications prescribed</p>
                 </div>
@@ -836,14 +836,14 @@ export default function PatientPage({
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-slate-200 flex items-center gap-2">
-                <Stethoscope className="w-5 h-5 text-teal-500" />
+              <CardTitle className="text-card-foreground flex items-center gap-2">
+                <Stethoscope className="w-5 h-5 text-emerald-500" />
                 Medical Visits
                 <Badge
                   variant="secondary"
-                  className="ml-auto bg-indigo-500/20 text-indigo-400"
+                  className="ml-auto bg-teal-500/20 text-teal-400"
                 >
                   {visits?.length || 0} visits
                 </Badge>
@@ -853,7 +853,7 @@ export default function PatientPage({
               {loadingVisits ? (
                 <div className="animate-pulse space-y-3">
                   {[1, 2].map((i) => (
-                    <div key={i} className="h-24 bg-slate-800 rounded-lg" />
+                    <div key={i} className="h-24 bg-muted rounded-lg" />
                   ))}
                 </div>
               ) : visits && visits.length > 0 ? (
@@ -861,10 +861,10 @@ export default function PatientPage({
                   {visits.map((visit: any) => (
                     <div
                       key={visit.id}
-                      className="p-4 bg-slate-800/50 rounded-lg border border-slate-700/50"
+                      className="p-4 bg-muted rounded-lg border border-border"
                     >
                       <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2 text-slate-400">
+                        <div className="flex items-center gap-2 text-muted-foreground">
                           <Calendar className="w-4 h-4" />
                           <span className="text-sm">
                             {formatDate(visit.visitDate)}
@@ -872,25 +872,25 @@ export default function PatientPage({
                         </div>
                         <Badge
                           variant="outline"
-                          className="border-slate-600 text-slate-400"
+                          className="border-border text-muted-foreground"
                         >
                           Dr. {visit.doctor?.name || "Unknown"}
                         </Badge>
                       </div>
                       {visit.diagnosis && (
                         <div className="mb-2">
-                          <label className="text-sm text-slate-500">
+                          <label className="text-sm text-muted-foreground">
                             Diagnosis
                           </label>
-                          <p className="text-slate-200">{visit.diagnosis}</p>
+                          <p className="text-card-foreground">{visit.diagnosis}</p>
                         </div>
                       )}
                       {visit.notes && (
                         <div>
-                          <label className="text-sm text-slate-500">
+                          <label className="text-sm text-muted-foreground">
                             Notes
                           </label>
-                          <p className="text-slate-300 text-sm">
+                          <p className="text-foreground text-sm">
                             {visit.notes}
                           </p>
                         </div>
@@ -899,17 +899,17 @@ export default function PatientPage({
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-8 text-muted-foreground">
                   <Stethoscope className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p>No medical visits recorded</p>
                 </div>
               )}
             </CardContent>
           </Card>
-          <Card className="bg-slate-900/50 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-slate-200 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-teal-500" />
+              <CardTitle className="text-card-foreground flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-500" />
                 Patient Records
                 <Badge
                   variant="secondary"
@@ -923,7 +923,7 @@ export default function PatientPage({
               {loadingRecords ? (
                 <div className="animate-pulse space-y-3">
                   {[1, 2].map((i) => (
-                    <div key={i} className="h-16 bg-slate-800 rounded-lg" />
+                    <div key={i} className="h-16 bg-muted rounded-lg" />
                   ))}
                 </div>
               ) : records && records.length > 0 ? (
@@ -931,17 +931,17 @@ export default function PatientPage({
                   {records.map((record: any) => (
                     <div
                       key={record.id}
-                      className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700/50"
+                      className="flex items-center justify-between p-4 bg-muted rounded-lg border border-border"
                     >
                       <div className="flex items-center gap-4">
                         <div className="p-2 rounded-lg bg-blue-500/20">
                           <FileText className="w-5 h-5 text-blue-400" />
                         </div>
                         <div>
-                          <p className="text-slate-200 font-medium">
+                          <p className="text-card-foreground font-medium">
                             {record.originalName}
                           </p>
-                          <div className="flex items-center gap-2 text-xs text-slate-400">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <span>{(record.size / 1024 / 1024).toFixed(2)} MB</span>
                             <span>•</span>
                             <span>{formatDate(record.createdAt)}</span>
@@ -956,7 +956,7 @@ export default function PatientPage({
                           target="_blank"
                           rel="noopener noreferrer"
                           download={record.originalName}
-                          className="p-2 text-slate-400 hover:text-blue-400 rounded-md hover:bg-slate-800"
+                          className="p-2 text-muted-foreground hover:text-blue-400 rounded-md hover:bg-muted"
                         >
                           <Download className="w-4 h-4" />
                         </a>
@@ -964,7 +964,7 @@ export default function PatientPage({
                           variant="ghost"
                           size="icon"
                           onClick={() => deleteRecordMutation.mutate({ id: record.id })}
-                          className="text-slate-400 hover:text-red-400"
+                          className="text-muted-foreground hover:text-red-400"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -973,7 +973,7 @@ export default function PatientPage({
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-8 text-muted-foreground">
                   <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p>No records uploaded</p>
                 </div>

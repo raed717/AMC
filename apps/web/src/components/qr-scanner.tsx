@@ -97,10 +97,10 @@ export default function QRScanner() {
   }, []);
 
   return (
-    <Card className="bg-slate-900/50 border-slate-800">
+    <Card className="bg-card border-border">
       <CardHeader className="flex flex-row items-center gap-2">
-        <Camera className="h-5 w-5 text-teal-500" />
-        <CardTitle className="text-slate-200 text-lg">Scan Patient QR Code</CardTitle>
+        <Camera className="h-5 w-5 text-emerald-500" />
+        <CardTitle className="text-card-foreground text-lg">Scan Patient QR Code</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div 
@@ -127,7 +127,7 @@ export default function QRScanner() {
             <Button
               onClick={startScanner}
               disabled={isStarting}
-              className="w-full bg-teal-600 hover:bg-teal-500"
+              className="w-full bg-emerald-600 hover:bg-emerald-500"
             >
               <Camera className="w-4 h-4 mr-2" />
               {isStarting ? "Starting..." : "Start Scanner"}
@@ -137,8 +137,8 @@ export default function QRScanner() {
 
         {isScanning && (
           <div className="space-y-4">
-            <div className="flex items-center justify-center gap-2 text-teal-400 text-sm">
-              <div className="w-2 h-2 bg-teal-400 rounded-full animate-pulse" />
+            <div className="flex items-center justify-center gap-2 text-emerald-400 text-sm">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
               <span>Point camera at QR code...</span>
             </div>
 
@@ -153,23 +153,23 @@ export default function QRScanner() {
           </div>
         )}
 
-        <div className="border-t border-slate-700 pt-4">
-          <p className="text-xs text-slate-500 text-center mb-3">Or enter patient ID manually</p>
+        <div className="border-t border-border pt-4">
+          <p className="text-xs text-muted-foreground text-center mb-3">Or enter patient ID manually</p>
           <form onSubmit={handleManualSubmit} className="flex gap-2">
             <Input
               type="text"
               placeholder="Enter patient ID"
               value={manualId}
               onChange={(e) => setManualId(e.target.value)}
-              className="bg-slate-800 border-slate-700 text-slate-200"
+              className="bg-muted border-border text-card-foreground"
             />
-            <Button type="submit" className="bg-teal-600 hover:bg-teal-500">
+            <Button type="submit" className="bg-emerald-600 hover:bg-emerald-500">
               Go
             </Button>
           </form>
         </div>
 
-        <p className="text-xs text-slate-500 text-center">
+        <p className="text-xs text-muted-foreground text-center">
           Position the patient's QR code within the camera frame to scan
         </p>
       </CardContent>

@@ -50,12 +50,12 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
           onSuccess: () => {
             router.push("/dashboard");
             toast.success("Account registration successful", {
-              className: "bg-slate-900 border-slate-800 text-slate-50",
+              className: "bg-card border-border text-foreground",
             });
           },
           onError: (error) => {
             toast.error(error.error.message || error.error.statusText, {
-              className: "bg-slate-900 border-red-500/50 text-red-400",
+              className: "bg-card border-red-500/50 text-red-400",
             });
           },
         },
@@ -97,27 +97,27 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
           to { opacity: 1; transform: translateY(0); }
         }
       `}} />
-      <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-8 shadow-2xl overflow-hidden relative group">
+      <div className="bg-card backdrop-blur-xl border border-border rounded-3xl p-8 shadow-2xl overflow-hidden relative group">
         {/* Glow Effects inside card */}
-        <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-colors duration-500" />
-        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl group-hover:bg-teal-500/20 transition-colors duration-500" />
+        <div className="absolute -top-24 -left-24 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl group-hover:bg-teal-500/20 transition-colors duration-500" />
+        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-colors duration-500" />
 
         <div className="relative mb-6 text-center">
-          <div className="inline-flex items-center justify-center p-3 rounded-xl bg-slate-950/50 border border-slate-800 mb-4 shadow-inner">
-            <ShieldCheck className="w-6 h-6 text-indigo-400" />
+          <div className="inline-flex items-center justify-center p-3 rounded-xl bg-background/50 border border-border mb-4 shadow-inner">
+            <ShieldCheck className="w-6 h-6 text-teal-400" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Register Node</h1>
-          <p className="text-slate-400 text-sm">Join the centralized medical infrastructure.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">Register Node</h1>
+          <p className="text-muted-foreground text-sm">Join the centralized medical infrastructure.</p>
         </div>
 
         {/* Role Selector */}
-        <div className="flex p-1 bg-slate-950/50 border border-slate-800 rounded-xl mb-6 relative z-10">
+        <div className="flex p-1 bg-background/50 border border-border rounded-xl mb-6 relative z-10">
           <button
             onClick={() => setRole("patient")}
             className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all ${
               role === "patient" 
-                ? "bg-slate-800 text-white shadow-md" 
-                : "text-slate-400 hover:text-slate-200"
+                ? "bg-muted text-foreground shadow-md" 
+                : "text-muted-foreground hover:text-card-foreground"
             }`}
           >
             <Users className="w-4 h-4" /> Patient
@@ -126,8 +126,8 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
             onClick={() => setRole("doctor")}
             className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all ${
               role === "doctor" 
-                ? "bg-indigo-500/20 text-indigo-300 shadow-md border border-indigo-500/30" 
-                : "text-slate-400 hover:text-slate-200"
+                ? "bg-teal-500/20 text-teal-300 shadow-md border border-teal-500/30" 
+                : "text-muted-foreground hover:text-card-foreground"
             }`}
           >
             <Stethoscope className="w-4 h-4" /> Doctor
@@ -146,11 +146,11 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
             <form.Field name="name">
               {(field) => (
                 <div className="space-y-1.5">
-                  <label htmlFor={field.name} className="text-sm font-medium text-slate-300 ml-1">
+                  <label htmlFor={field.name} className="text-sm font-medium text-foreground ml-1">
                     Full Name
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
                       <User className="h-4 w-4" />
                     </div>
                     <input
@@ -159,7 +159,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
-                      className="w-full bg-slate-950/50 border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
+                      className="w-full bg-background/50 border border-border rounded-xl py-2.5 pl-10 pr-4 text-card-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all"
                       placeholder={role === "doctor" ? "Dr. Jane Smith" : "Jane Smith"}
                     />
                   </div>
@@ -177,7 +177,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
             <form.Field name="birthday">
               {(field) => (
                 <div className="space-y-1.5">
-                  <label htmlFor={field.name} className="text-sm font-medium text-slate-300 ml-1">
+                  <label htmlFor={field.name} className="text-sm font-medium text-foreground ml-1">
                     Date of Birth
                   </label>
                   <div className="relative">
@@ -188,7 +188,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
-                      className="w-full bg-slate-950/50 border border-slate-800 rounded-xl py-2.5 px-4 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all [&::-webkit-calendar-picker-indicator]:invert"
+                      className="w-full bg-background/50 border border-border rounded-xl py-2.5 px-4 text-card-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all [&::-webkit-calendar-picker-indicator]:invert"
                     />
                   </div>
                   {field.state.meta.errors.map((error) => (
@@ -203,7 +203,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
             <form.Field name="gender">
               {(field) => (
                 <div className="space-y-1.5">
-                  <label htmlFor={field.name} className="text-sm font-medium text-slate-300 ml-1">
+                  <label htmlFor={field.name} className="text-sm font-medium text-foreground ml-1">
                     Gender
                   </label>
                   <div className="relative">
@@ -213,14 +213,14 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
-                      className="w-full bg-slate-950/50 border border-slate-800 rounded-xl py-2.5 px-4 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all appearance-none"
+                      className="w-full bg-background/50 border border-border rounded-xl py-2.5 px-4 text-card-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all appearance-none"
                     >
                       <option value="" disabled>Select...</option>
                       <option value="male">Male</option>
                       <option value="female">Female</option>
                       <option value="other">Other</option>
                     </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-muted-foreground">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
                   </div>
@@ -239,7 +239,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
               <form.Field name="specialization">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <label htmlFor={field.name} className="text-sm font-medium text-slate-300 ml-1">
+                    <label htmlFor={field.name} className="text-sm font-medium text-foreground ml-1">
                       Specialization
                     </label>
                     <div className="relative">
@@ -249,14 +249,14 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                         value={field.state.value}
                         onBlur={field.handleBlur}
                         onChange={(e) => field.handleChange(e.target.value)}
-                        className="w-full bg-slate-950/50 border border-slate-800 rounded-xl py-2.5 px-4 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all appearance-none"
+                        className="w-full bg-background/50 border border-border rounded-xl py-2.5 px-4 text-card-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all appearance-none"
                       >
                         <option value="" disabled>Select specialization...</option>
                         {SPECIALIZATIONS.map(spec => (
                           <option key={spec} value={spec.toLowerCase()}>{spec}</option>
                         ))}
                       </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500">
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-muted-foreground">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                       </div>
                     </div>
@@ -275,11 +275,11 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
             <form.Field name="email">
               {(field) => (
                 <div className="space-y-1.5">
-                  <label htmlFor={field.name} className="text-sm font-medium text-slate-300 ml-1">
+                  <label htmlFor={field.name} className="text-sm font-medium text-foreground ml-1">
                     Secure Email
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
                       <Mail className="h-4 w-4" />
                     </div>
                     <input
@@ -289,7 +289,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
-                      className="w-full bg-slate-950/50 border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
+                      className="w-full bg-background/50 border border-border rounded-xl py-2.5 pl-10 pr-4 text-card-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all"
                       placeholder="admin@hospital.com"
                     />
                   </div>
@@ -307,11 +307,11 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
             <form.Field name="password">
               {(field) => (
                 <div className="space-y-1.5">
-                  <label htmlFor={field.name} className="text-sm font-medium text-slate-300 ml-1">
+                  <label htmlFor={field.name} className="text-sm font-medium text-foreground ml-1">
                     Master Password
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
                       <Lock className="h-4 w-4" />
                     </div>
                     <input
@@ -321,7 +321,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
-                      className="w-full bg-slate-950/50 border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
+                      className="w-full bg-background/50 border border-border rounded-xl py-2.5 pl-10 pr-4 text-card-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all"
                       placeholder="••••••••"
                     />
                   </div>
@@ -341,7 +341,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                 <button
                   type="submit"
                   disabled={!state.canSubmit || state.isSubmitting}
-                  className="w-full relative flex items-center justify-center py-3.5 px-4 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] group"
+                  className="w-full relative flex items-center justify-center py-3.5 px-4 rounded-xl bg-teal-500 hover:bg-teal-400 text-primary-foreground font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] group"
                 >
                   {state.isSubmitting ? (
                     "Provisioning..."
@@ -356,18 +356,18 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
             </form.Subscribe>
           </div>
           
-          <div className="mt-4 text-xs text-center text-slate-500">
+          <div className="mt-4 text-xs text-center text-muted-foreground">
             By registering, you agree to AMC's strict data compliance & HIPAA policies.
           </div>
         </form>
       </div>
 
       <div className="mt-6 text-center">
-        <p className="text-slate-400 text-sm">
+        <p className="text-muted-foreground text-sm">
           Node already active?{" "}
           <button
             onClick={onSwitchToSignIn}
-            className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+            className="text-teal-400 hover:text-teal-300 font-medium transition-colors"
           >
             Sign in here
           </button>

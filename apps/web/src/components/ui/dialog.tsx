@@ -36,11 +36,11 @@ function DialogContent({
   onClose?: () => void;
 }) {
   return (
-    <div className={cn("bg-slate-900 border border-slate-800 rounded-lg p-6 relative", className)}>
+    <div className={cn("bg-card border border-border rounded-lg p-6 relative", className)}>
       {onClose && (
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-200"
+          className="absolute top-4 right-4 text-muted-foreground hover:text-card-foreground"
         >
           <X className="w-4 h-4" />
         </button>
@@ -55,7 +55,7 @@ function DialogHeader({ className, children }: { className?: string; children: R
 }
 
 function DialogTitle({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <h2 className={cn("text-lg font-semibold text-slate-100", className)}>{children}</h2>;
+  return <h2 className={cn("text-lg font-semibold text-card-foreground", className)}>{children}</h2>;
 }
 
 interface DialogTriggerProps {

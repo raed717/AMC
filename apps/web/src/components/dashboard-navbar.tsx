@@ -27,13 +27,13 @@ export default function DashboardNavbar() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <Activity className="h-6 w-6 text-teal-500" />
-              <span className="text-lg font-semibold text-slate-100">AMC</span>
+            <Link href="/" className="flex items-center gap-2">
+              <Activity className="h-6 w-6 text-emerald-500" />
+              <span className="text-lg font-semibold text-card-foreground">AMC</span>
             </Link>
             
             <nav className="hidden md:flex items-center gap-1">
@@ -45,8 +45,8 @@ export default function DashboardNavbar() {
                     href={link.href as any}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                       isActive
-                        ? "bg-teal-500/10 text-teal-400"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                        ? "bg-emerald-500/10 text-emerald-400"
+                        : "text-muted-foreground hover:text-card-foreground hover:bg-muted"
                     }`}
                   >
                     {link.label}
@@ -61,7 +61,7 @@ export default function DashboardNavbar() {
             <UserMenu />
             
             <button
-              className="md:hidden p-2 text-slate-400 hover:text-slate-200"
+              className="md:hidden p-2 text-muted-foreground hover:text-card-foreground"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -70,7 +70,7 @@ export default function DashboardNavbar() {
         </div>
 
         {mobileMenuOpen && (
-          <nav className="md:hidden py-4 border-t border-slate-800">
+          <nav className="md:hidden py-4 border-t border-border">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
                 return (
@@ -79,8 +79,8 @@ export default function DashboardNavbar() {
                     href={link.href as any}
                     className={`block px-4 py-3 text-sm font-medium rounded-lg transition-all ${
                       isActive
-                        ? "bg-teal-500/10 text-teal-400"
-                        : "text-slate-400 hover:text-slate-200"
+                        ? "bg-emerald-500/10 text-emerald-400"
+                        : "text-muted-foreground hover:text-card-foreground"
                     }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
