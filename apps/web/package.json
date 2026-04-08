@@ -30,6 +30,8 @@
     "filepond-plugin-file-validate-type": "^1.2.9",
     "filepond-plugin-image-preview": "^4.6.12",
     "html5-qrcode": "^2.3.8",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "jsqr": "^1.4.0",
     "libsql": "0.5.22",
     "lucide-react": "^0.577.0",

@@ -12,6 +12,7 @@ export const user = sqliteTable("user", {
   gender: text("gender"),
   specialization: text("specialization"),
   phone: text("phone"),
+  chronicDiseases: text("chronic_diseases", { mode: "json" }).$type<string[]>(),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
     .notNull(),
@@ -73,6 +74,27 @@ export const visitMedications = sqliteTable("visit_medications", {
   medicationId: text("medication_id")
     .notNull()
     .references(() => medications.id, { onDelete: "cascade" }),
+});
+
+export const patientRecords = sqliteTable("patient_records", {
+  id: text("id").primaryKey(),
+  patientId: text("patient_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  doctorId: text("doctor_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  originalName: text("original_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
 });
 
 export const session = sqliteTable(
@@ -149,6 +171,7 @@ export const userRelations = relations(user, ({ many }) => ({
   accounts: many(account),
   patientVisits: many(medicalVisits),
   medications: many(medications),
+  patientRecords: many(patientRecords),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -195,5 +218,18 @@ export const visitMedicationsRelations = relations(visitMedications, ({ one }) =
   medication: one(medications, {
     fields: [visitMedications.medicationId],
     references: [medications.id],
+  }),
+}));
+
+export const patientRecordsRelations = relations(patientRecords, ({ one }) => ({
+  patient: one(user, {
+    fields: [patientRecords.patientId],
+    references: [user.id],
+    relationName: "patient",
+  }),
+  doctor: one(user, {
+    fields: [patientRecords.doctorId],
+    references: [user.id],
+    relationName: "doctor",
   }),
 }));

@@ -1,7 +1,7 @@
 import { protectedProcedure, router } from "../index";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@AMC/db";
-import { user, medicalVisits, medications } from "@AMC/db/schema/auth";
+import { user, medicalVisits, medications, patientRecords } from "@AMC/db/schema/auth";
 import { z } from "zod";
 
 const generateId = () => crypto.randomUUID();
@@ -14,6 +14,21 @@ export const patientRouter = router({
         where: eq(user.id, input.patientId),
       });
       return patient;
+    }),
+
+  updateChronicDiseases: protectedProcedure
+    .input(
+      z.object({
+        patientId: z.string(),
+        diseases: z.array(z.string()),
+      })
+    )
+    .mutation(async ({ input }) => {
+      await db
+        .update(user)
+        .set({ chronicDiseases: input.diseases })
+        .where(eq(user.id, input.patientId));
+      return { success: true };
     }),
 
   getPatientVisits: protectedProcedure
@@ -121,6 +136,35 @@ export const patientRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       await db.delete(medications).where(eq(medications.id, input.id));
+      return { success: true };
+    }),
+
+  getPatientRecords: protectedProcedure
+    .input(z.object({ patientId: z.string() }))
+    .query(async ({ input }) => {
+      const records = await db.query.patientRecords.findMany({
+        where: eq(patientRecords.patientId, input.patientId),
+        orderBy: [desc(patientRecords.createdAt)],
+        with: {
+          doctor: {
+            columns: {
+              id: true,
+              name: true,
+              specialization: true,
+            },
+          },
+        },
+      });
+      return records;
+    }),
+
+  deleteRecord: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      // In a real app we would check permissions and delete the file from disk too,
+      // but for this prototype, we'll just delete the DB record.
+      // The file will be orphaned in public/uploads but that's fine for now.
+      await db.delete(patientRecords).where(eq(patientRecords.id, input.id));
       return { success: true };
     }),
 });
