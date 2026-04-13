@@ -49,6 +49,13 @@ const COMMON_DISEASES = [
   "Osteoporosis",
 ];
 
+const getDefaultVisitDate = () => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  const localDate = new Date(now.getTime() - offset * 60_000);
+  return localDate.toISOString().slice(0, 16);
+};
+
 export default function PatientPage({
   params,
 }: {
@@ -118,6 +125,7 @@ export default function PatientPage({
       patientId: string;
       notes?: string;
       diagnosis?: string;
+      visitDate?: string;
     }) => {
       return trpcClient.patient.createVisit.mutate(data);
     },
@@ -206,6 +214,7 @@ export default function PatientPage({
 
   const [visitNotes, setVisitNotes] = useState("");
   const [visitDiagnosis, setVisitDiagnosis] = useState("");
+  const [visitDate, setVisitDate] = useState(getDefaultVisitDate());
   const [showVisitDialog, setShowVisitDialog] = useState(false);
 
   const [medName, setMedName] = useState("");
@@ -332,9 +341,11 @@ export default function PatientPage({
       patientId,
       notes: visitNotes || undefined,
       diagnosis: visitDiagnosis || undefined,
+      visitDate: new Date(visitDate).toISOString(),
     });
     setVisitNotes("");
     setVisitDiagnosis("");
+    setVisitDate(getDefaultVisitDate());
     setShowVisitDialog(false);
   };
 
@@ -381,6 +392,11 @@ export default function PatientPage({
     return FREQUENCIES.find((f) => f.value === value)?.label || value;
   };
 
+  const isFutureVisit = (date: Date | string | null) => {
+    if (!date) return false;
+    return new Date(date).getTime() > Date.now();
+  };
+
   if (loadingPatient) {
     return (
       <div className="flex items-center justify-center min-h-100">
@@ -419,16 +435,25 @@ export default function PatientPage({
               <DialogHeader>
                 <DialogTitle>New Medical Visit</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleCreateVisit} className="space-y-4">
-                <div>
-                  <label className="text-sm text-muted-foreground">Diagnosis</label>
-                  <Input
-                    value={visitDiagnosis}
-                    onChange={(e) => setVisitDiagnosis(e.target.value)}
-                    placeholder="Enter diagnosis"
-                    className="bg-muted border-border text-card-foreground"
-                  />
-                </div>
+               <form onSubmit={handleCreateVisit} className="space-y-4">
+                 <div>
+                   <label className="text-sm text-muted-foreground">Visit Date</label>
+                   <Input
+                     type="datetime-local"
+                     value={visitDate}
+                     onChange={(e) => setVisitDate(e.target.value)}
+                     className="bg-muted border-border text-foreground"
+                   />
+                 </div>
+                 <div>
+                   <label className="text-sm text-muted-foreground">Diagnosis</label>
+                   <Input
+                     value={visitDiagnosis}
+                     onChange={(e) => setVisitDiagnosis(e.target.value)}
+                     placeholder="Enter diagnosis"
+                     className="bg-muted border-border text-card-foreground"
+                   />
+                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground">Notes</label>
                   <Textarea
@@ -876,6 +901,11 @@ export default function PatientPage({
                         >
                           Dr. {visit.doctor?.name || "Unknown"}
                         </Badge>
+                        {isFutureVisit(visit.visitDate) && (
+                          <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                            Coming Appointment
+                          </Badge>
+                        )}
                       </div>
                       {visit.diagnosis && (
                         <div className="mb-2">

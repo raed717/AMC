@@ -60,12 +60,55 @@ export const patientRouter = router({
       return meds;
     }),
 
+  getMyMedications: protectedProcedure.query(async ({ ctx }) => {
+    const meds = await db.query.medications.findMany({
+      where: eq(medications.patientId, ctx.session.user.id),
+      orderBy: [desc(medications.createdAt)],
+    });
+    return meds;
+  }),
+
+  getMyRecords: protectedProcedure.query(async ({ ctx }) => {
+    const records = await db.query.patientRecords.findMany({
+      where: eq(patientRecords.patientId, ctx.session.user.id),
+      orderBy: [desc(patientRecords.createdAt)],
+      with: {
+        doctor: {
+          columns: {
+            id: true,
+            name: true,
+            specialization: true,
+          },
+        },
+      },
+    });
+    return records;
+  }),
+
+  getMyVisits: protectedProcedure.query(async ({ ctx }) => {
+    const visits = await db.query.medicalVisits.findMany({
+      where: eq(medicalVisits.patientId, ctx.session.user.id),
+      orderBy: [desc(medicalVisits.visitDate)],
+      with: {
+        doctor: {
+          columns: {
+            id: true,
+            name: true,
+            specialization: true,
+          },
+        },
+      },
+    });
+    return visits;
+  }),
+
   createVisit: protectedProcedure
     .input(
       z.object({
         patientId: z.string(),
         notes: z.string().optional(),
         diagnosis: z.string().optional(),
+        visitDate: z.string().datetime().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -73,7 +116,7 @@ export const patientRouter = router({
         id: generateId(),
         patientId: input.patientId,
         doctorId: ctx.session.user.id,
-        visitDate: new Date(),
+        visitDate: input.visitDate ? new Date(input.visitDate) : new Date(),
         notes: input.notes || null,
         diagnosis: input.diagnosis || null,
       });
