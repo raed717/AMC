@@ -1,5 +1,10 @@
 import { relations, sql } from "drizzle-orm";
 import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import {
+  DOCUMENT_REQUEST_STATUSES,
+  DOCUMENT_TYPES,
+  DEFAULT_DOCUMENT_TYPE,
+} from "../document-types";
 
 export const user = sqliteTable("user", {
   id: text("id").primaryKey(),
@@ -84,10 +89,40 @@ export const patientRecords = sqliteTable("patient_records", {
   doctorId: text("doctor_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  uploaderId: text("uploader_id").references(() => user.id, { onDelete: "set null" }),
   fileName: text("file_name").notNull(),
   originalName: text("original_name").notNull(),
+  documentType: text("document_type", { enum: DOCUMENT_TYPES })
+    .default(DEFAULT_DOCUMENT_TYPE)
+    .notNull(),
   mimeType: text("mime_type").notNull(),
   size: integer("size").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const documentRequests = sqliteTable("document_requests", {
+  id: text("id").primaryKey(),
+  patientId: text("patient_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  doctorId: text("doctor_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  documentType: text("document_type", { enum: DOCUMENT_TYPES }).notNull(),
+  status: text("status", { enum: DOCUMENT_REQUEST_STATUSES })
+    .default("pending")
+    .notNull(),
+  note: text("note"),
+  fulfilledRecordId: text("fulfilled_record_id").references(() => patientRecords.id, {
+    onDelete: "set null",
+  }),
+  fulfilledAt: integer("fulfilled_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
     .notNull(),
@@ -172,6 +207,8 @@ export const userRelations = relations(user, ({ many }) => ({
   patientVisits: many(medicalVisits),
   medications: many(medications),
   patientRecords: many(patientRecords),
+  patientDocumentRequests: many(documentRequests, { relationName: "patientRequest" }),
+  doctorDocumentRequests: many(documentRequests, { relationName: "doctorRequest" }),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -231,5 +268,31 @@ export const patientRecordsRelations = relations(patientRecords, ({ one }) => ({
     fields: [patientRecords.doctorId],
     references: [user.id],
     relationName: "doctor",
+  }),
+  uploader: one(user, {
+    fields: [patientRecords.uploaderId],
+    references: [user.id],
+    relationName: "uploader",
+  }),
+  fulfilledRequest: one(documentRequests, {
+    fields: [patientRecords.id],
+    references: [documentRequests.fulfilledRecordId],
+  }),
+}));
+
+export const documentRequestsRelations = relations(documentRequests, ({ one }) => ({
+  patient: one(user, {
+    fields: [documentRequests.patientId],
+    references: [user.id],
+    relationName: "patientRequest",
+  }),
+  doctor: one(user, {
+    fields: [documentRequests.doctorId],
+    references: [user.id],
+    relationName: "doctorRequest",
+  }),
+  fulfilledRecord: one(patientRecords, {
+    fields: [documentRequests.fulfilledRecordId],
+    references: [patientRecords.id],
   }),
 }));

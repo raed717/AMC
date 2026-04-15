@@ -1,10 +1,10 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { trpc, trpcClient } from "@/utils/trpc";
 import { toast } from "sonner";
-import { FileText, Download, Trash2, User, Calendar, Pill, Stethoscope, AlertCircle, X, Activity, Edit3, CheckSquare, Printer } from "lucide-react";
+import { FileText, Download, Trash2, User, Calendar, Pill, Stethoscope, AlertCircle, X, Activity, Edit3, CheckSquare, Printer, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,13 @@ import "filepond-plugin-image-preview/dist/filepond-plugin-image-preview.css";
 import FilePondPluginFileValidateSize from "filepond-plugin-file-validate-size";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  DEFAULT_DOCUMENT_TYPE,
+  DOCUMENT_TYPES,
+  DOCUMENT_REQUEST_STATUS_LABELS,
+  DOCUMENT_TYPE_LABELS,
+  type DocumentType,
+} from "@AMC/db/document-types";
 
 registerPlugin(FilePondPluginImagePreview, FilePondPluginFileValidateSize);
 
@@ -56,6 +63,11 @@ const getDefaultVisitDate = () => {
   return localDate.toISOString().slice(0, 16);
 };
 
+const documentTypeOptions = DOCUMENT_TYPES.map((value) => ({
+  value,
+  label: DOCUMENT_TYPE_LABELS[value],
+}));
+
 export default function PatientPage({
   params,
 }: {
@@ -86,6 +98,12 @@ export default function PatientPage({
     patientId,
   });
   const { data: records, isLoading: loadingRecords } = useQuery(recordsQueryOptions);
+  const documentRequestsQueryOptions = trpc.patient.getPatientDocumentRequests.queryOptions({
+    patientId,
+  });
+  const { data: documentRequests, isLoading: loadingDocumentRequests } = useQuery(
+    documentRequestsQueryOptions,
+  );
 
   const { data: privateData } = useQuery(trpc.privateData.queryOptions());
   const doctor = privateData?.user;
@@ -105,6 +123,21 @@ export default function PatientPage({
     },
   });
 
+  const updateRecordTypeMutation = useMutation({
+    mutationFn: async (data: { id: string; documentType: DocumentType }) => {
+      return trpcClient.patient.updateRecordType.mutate(data);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: recordsQueryOptions.queryKey,
+      });
+      toast.success("Document type updated");
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+    },
+  });
+
   const updateDiseasesMutation = useMutation({
     mutationFn: async (data: { patientId: string; diseases: string[] }) => {
       return trpcClient.patient.updateChronicDiseases.mutate(data);
@@ -114,6 +147,25 @@ export default function PatientPage({
         queryKey: patientQueryOptions.queryKey,
       });
       toast.success("Chronic diseases updated");
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+    },
+  });
+
+  const createDocumentRequestMutation = useMutation({
+    mutationFn: async (data: {
+      patientId: string;
+      documentType: DocumentType;
+      note?: string;
+    }) => {
+      return trpcClient.patient.createDocumentRequest.mutate(data);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: documentRequestsQueryOptions.queryKey,
+      });
+      toast.success("Document request created");
     },
     onError: (error: any) => {
       toast.error(error.message);
@@ -137,6 +189,26 @@ export default function PatientPage({
         queryKey: visitsQueryOptions.queryKey,
       });
       toast.success("Visit saved successfully");
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+    },
+  });
+
+  const updateVisitMutation = useMutation({
+    mutationFn: async (data: {
+      id: string;
+      notes?: string;
+      diagnosis?: string;
+      visitDate?: string;
+    }) => {
+      return trpcClient.patient.updateVisit.mutate(data);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: visitsQueryOptions.queryKey,
+      });
+      toast.success("Visit updated successfully");
     },
     onError: (error: any) => {
       toast.error(error.message);
@@ -216,8 +288,11 @@ export default function PatientPage({
   const [visitDiagnosis, setVisitDiagnosis] = useState("");
   const [visitDate, setVisitDate] = useState(getDefaultVisitDate());
   const [showVisitDialog, setShowVisitDialog] = useState(false);
+  const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
 
   const [medName, setMedName] = useState("");
+  const [medSearchQuery, setMedSearchQuery] = useState("");
+  const [showMedicationResults, setShowMedicationResults] = useState(false);
   const [medDosage, setMedDosage] = useState("");
   const [medFrequency, setMedFrequency] = useState("twice_daily");
   const [medMorningDose, setMedMorningDose] = useState("");
@@ -225,9 +300,23 @@ export default function PatientPage({
   const [medNotes, setMedNotes] = useState("");
   const [showMedDialog, setShowMedDialog] = useState(false);
   const [showRecordDialog, setShowRecordDialog] = useState(false);
+  const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [showDiseasesDialog, setShowDiseasesDialog] = useState(false);
   const [selectedDiseases, setSelectedDiseases] = useState<string[]>([]);
+  const [selectedDocumentType, setSelectedDocumentType] =
+    useState<DocumentType>(DEFAULT_DOCUMENT_TYPE);
+  const [requestedDocumentType, setRequestedDocumentType] =
+    useState<DocumentType>(DEFAULT_DOCUMENT_TYPE);
+  const [requestNote, setRequestNote] = useState("");
   const [files, setFiles] = useState<any[]>([]);
+
+  const medicationCatalogQueryOptions = trpc.patient.searchMedicationCatalog.queryOptions(
+    { query: medSearchQuery },
+  );
+  const { data: medicationSuggestions, isFetching: loadingMedicationSuggestions } = useQuery({
+    ...medicationCatalogQueryOptions,
+    enabled: medSearchQuery.trim().length >= 2,
+  });
 
   const openDiseasesDialog = () => {
     setSelectedDiseases(patient?.chronicDiseases || []);
@@ -337,16 +426,38 @@ export default function PatientPage({
 
   const handleCreateVisit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await createVisitMutation.mutateAsync({
-      patientId,
-      notes: visitNotes || undefined,
-      diagnosis: visitDiagnosis || undefined,
-      visitDate: new Date(visitDate).toISOString(),
-    });
+    if (editingVisitId) {
+      await updateVisitMutation.mutateAsync({
+        id: editingVisitId,
+        notes: visitNotes || undefined,
+        diagnosis: visitDiagnosis || undefined,
+        visitDate: new Date(visitDate).toISOString(),
+      });
+    } else {
+      await createVisitMutation.mutateAsync({
+        patientId,
+        notes: visitNotes || undefined,
+        diagnosis: visitDiagnosis || undefined,
+        visitDate: new Date(visitDate).toISOString(),
+      });
+    }
     setVisitNotes("");
     setVisitDiagnosis("");
     setVisitDate(getDefaultVisitDate());
+    setEditingVisitId(null);
     setShowVisitDialog(false);
+  };
+
+  const handleEditVisit = (visit: any) => {
+    setEditingVisitId(visit.id);
+    setVisitDiagnosis(visit.diagnosis || "");
+    setVisitNotes(visit.notes || "");
+    const date = new Date(visit.visitDate);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+      .toISOString()
+      .slice(0, 16);
+    setVisitDate(local);
+    setShowVisitDialog(true);
   };
 
   const handleCreateMedication = async (e: React.FormEvent) => {
@@ -368,13 +479,27 @@ export default function PatientPage({
       nightDose: medNightDose || undefined,
       notes: medNotes || undefined,
     });
+    setMedSearchQuery("");
     setMedName("");
     setMedDosage("");
     setMedFrequency("twice_daily");
     setMedMorningDose("");
     setMedNightDose("");
     setMedNotes("");
+    setShowMedicationResults(false);
     setShowMedDialog(false);
+  };
+
+  const handleSelectMedication = (entry: {
+    name: string;
+    dosage: string;
+  }) => {
+    setMedName(entry.name);
+    setMedSearchQuery(entry.name);
+    if (!medDosage) {
+      setMedDosage(entry.dosage);
+    }
+    setShowMedicationResults(false);
   };
 
   const formatDate = (date: Date | string | null) => {
@@ -397,6 +522,36 @@ export default function PatientPage({
     return new Date(date).getTime() > Date.now();
   };
 
+  const handleCreateDocumentRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await createDocumentRequestMutation.mutateAsync({
+      patientId,
+      documentType: requestedDocumentType,
+      note: requestNote || undefined,
+    });
+    setRequestedDocumentType(DEFAULT_DOCUMENT_TYPE);
+    setRequestNote("");
+    setShowRequestDialog(false);
+  };
+
+  const groupedRecords = useMemo(() => {
+    const base = Object.fromEntries(
+      documentTypeOptions.map((option) => [option.value, [] as any[]]),
+    ) as Record<DocumentType, any[]>;
+
+    for (const record of records ?? []) {
+      const key = (record.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType;
+      base[key].push(record);
+    }
+
+    return documentTypeOptions
+      .map((option) => ({
+        ...option,
+        records: base[option.value],
+      }))
+      .filter((group) => group.records.length > 0);
+  }, [records]);
+
   if (loadingPatient) {
     return (
       <div className="flex items-center justify-center min-h-100">
@@ -416,24 +571,19 @@ export default function PatientPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div>
         <div>
           <h1 className="text-3xl font-bold text-card-foreground">Patient Records</h1>
           <p className="text-muted-foreground">Managing records for {patient.name}</p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            className="bg-emerald-600 hover:bg-emerald-500"
-            onClick={() => setShowVisitDialog(true)}
-          >
-            <Stethoscope className="w-4 h-4 mr-2" />
-            New Visit
-          </Button>
+      </div>
 
-          <Dialog open={showVisitDialog} onOpenChange={setShowVisitDialog}>
+      <Dialog open={showVisitDialog} onOpenChange={setShowVisitDialog}>
             <DialogContent onClose={() => setShowVisitDialog(false)}>
               <DialogHeader>
-                <DialogTitle>New Medical Visit</DialogTitle>
+                <DialogTitle>
+                  {editingVisitId ? "Edit Medical Visit" : "New Medical Visit"}
+                </DialogTitle>
               </DialogHeader>
                <form onSubmit={handleCreateVisit} className="space-y-4">
                  <div>
@@ -466,37 +616,41 @@ export default function PatientPage({
                 </div>
                 <Button
                   type="submit"
-                  disabled={createVisitMutation.isPending}
+                  disabled={createVisitMutation.isPending || updateVisitMutation.isPending}
                   className="w-full bg-emerald-600 hover:bg-emerald-500"
                 >
-                  {createVisitMutation.isPending ? "Saving..." : "Save Visit"}
+                  {createVisitMutation.isPending || updateVisitMutation.isPending
+                    ? "Saving..."
+                    : editingVisitId
+                      ? "Update Visit"
+                      : "Save Visit"}
                 </Button>
               </form>
             </DialogContent>
-          </Dialog>
+      </Dialog>
 
-          <Button
-            className="bg-teal-600 hover:bg-teal-500"
-            onClick={() => setShowMedDialog(true)}
-          >
-            <Pill className="w-4 h-4 mr-2" />
-            Add Medication
-          </Button>
-
-          <Button
-            className="bg-blue-600 hover:bg-blue-500"
-            onClick={() => setShowRecordDialog(true)}
-          >
-            <FileText className="w-4 h-4 mr-2" />
-            Upload Record
-          </Button>
-
-          <Dialog open={showRecordDialog} onOpenChange={setShowRecordDialog}>
+      <Dialog open={showRecordDialog} onOpenChange={setShowRecordDialog}>
             <DialogContent onClose={() => setShowRecordDialog(false)}>
               <DialogHeader>
                 <DialogTitle>Upload Patient Record</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-muted-foreground">Document Type</label>
+                  <select
+                    value={selectedDocumentType}
+                    onChange={(e) =>
+                      setSelectedDocumentType(e.target.value as DocumentType)
+                    }
+                    className="mt-2 w-full rounded-md border border-border bg-muted px-3 py-2 text-card-foreground"
+                  >
+                    {documentTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <FilePond
                   files={files}
                   onupdatefiles={setFiles}
@@ -511,12 +665,14 @@ export default function PatientPage({
                       },
                       ondata: (formData) => {
                         formData.append("patientId", patientId);
+                        formData.append("documentType", selectedDocumentType);
                         return formData;
                       },
                       onload: (res) => {
                         toast.success("File uploaded successfully");
                         setShowRecordDialog(false);
                         setFiles([]);
+                        setSelectedDocumentType(DEFAULT_DOCUMENT_TYPE);
                         queryClient.invalidateQueries({
                           queryKey: recordsQueryOptions.queryKey,
                         });
@@ -533,9 +689,54 @@ export default function PatientPage({
                 />
               </div>
             </DialogContent>
-          </Dialog>
+      </Dialog>
 
-          <Dialog open={showMedDialog} onOpenChange={setShowMedDialog}>
+      <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
+            <DialogContent onClose={() => setShowRequestDialog(false)}>
+              <DialogHeader>
+                <DialogTitle>Request a Medical Document</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreateDocumentRequest} className="space-y-4">
+                <div>
+                  <label className="text-sm text-muted-foreground">Document Type</label>
+                  <select
+                    value={requestedDocumentType}
+                    onChange={(e) =>
+                      setRequestedDocumentType(e.target.value as DocumentType)
+                    }
+                    className="mt-2 w-full rounded-md border border-border bg-muted px-3 py-2 text-card-foreground"
+                  >
+                    {documentTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Doctor Note</label>
+                  <Textarea
+                    value={requestNote}
+                    onChange={(e) => setRequestNote(e.target.value)}
+                    placeholder="Add context for the patient, for example fasting instructions or deadline"
+                    rows={4}
+                    className="bg-muted border-border text-card-foreground"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={createDocumentRequestMutation.isPending}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500"
+                >
+                  {createDocumentRequestMutation.isPending
+                    ? "Sending Request..."
+                    : "Send Request"}
+                </Button>
+              </form>
+            </DialogContent>
+      </Dialog>
+
+      <Dialog open={showMedDialog} onOpenChange={setShowMedDialog}>
             <DialogContent onClose={() => setShowMedDialog(false)}>
               <DialogHeader>
                 <DialogTitle>Add Medication</DialogTitle>
@@ -543,14 +744,74 @@ export default function PatientPage({
               <form onSubmit={handleCreateMedication} className="space-y-4">
                 <div>
                   <label className="text-sm text-muted-foreground">
-                    Medication Name *
+                    Search Medication *
                   </label>
-                  <Input
-                    value={medName}
-                    onChange={(e) => setMedName(e.target.value)}
-                    placeholder="Enter medication name"
-                    className="bg-muted border-border text-card-foreground"
-                  />
+                  <div className="relative">
+                    <Input
+                      value={medSearchQuery}
+                      onChange={(e) => {
+                        setMedSearchQuery(e.target.value);
+                        setMedName(e.target.value);
+                        setShowMedicationResults(true);
+                      }}
+                      onFocus={() => setShowMedicationResults(true)}
+                      placeholder="Search by name, dosage, DCI, or laboratory"
+                      className="bg-muted border-border text-card-foreground"
+                    />
+                    {showMedicationResults && medSearchQuery.trim().length >= 2 && (
+                      <div className="absolute z-20 mt-2 max-h-64 w-full overflow-auto rounded-xl border border-border bg-card p-2 shadow-xl">
+                        {loadingMedicationSuggestions ? (
+                          <div className="px-3 py-4 text-sm text-muted-foreground">
+                            Searching medications...
+                          </div>
+                        ) : medicationSuggestions && medicationSuggestions.length > 0 ? (
+                          <div className="space-y-1">
+                            {medicationSuggestions.map((entry) => (
+                              <button
+                                key={entry.id}
+                                type="button"
+                                onClick={() => handleSelectMedication(entry)}
+                                className="w-full rounded-lg border border-transparent px-3 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/70 dark:hover:border-emerald-900 dark:hover:bg-emerald-950/30"
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="font-medium text-foreground">{entry.name}</p>
+                                  {entry.dosage && (
+                                    <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300">
+                                      {entry.dosage}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                  {entry.form && <span>{entry.form}</span>}
+                                  {entry.dci && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{entry.dci}</span>
+                                    </>
+                                  )}
+                                  {entry.laboratory && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{entry.laboratory}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="px-3 py-4 text-sm text-muted-foreground">
+                            No medications found.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {medName && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Selected medication: <span className="font-medium text-foreground">{medName}</span>
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground">Dosage</label>
@@ -616,9 +877,7 @@ export default function PatientPage({
                 </Button>
               </form>
             </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+      </Dialog>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1">
@@ -767,26 +1026,41 @@ export default function PatientPage({
         <div className="lg:col-span-2 space-y-6">
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-card-foreground flex items-center gap-2">
-                <Pill className="w-5 h-5 text-emerald-500" />
-                Current Medications
-                <Badge
-                  variant="secondary"
-                  className="ml-2 bg-emerald-500/20 text-emerald-400"
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-card-foreground flex items-center gap-2">
+                  <Pill className="w-5 h-5 text-emerald-500" />
+                  Current Medications
+                  <Badge
+                    variant="secondary"
+                    className="ml-2 bg-emerald-500/20 text-emerald-400"
+                  >
+                    {medications?.filter((m: any) => m.isActive).length || 0}{" "}
+                    active
+                  </Badge>
+                </CardTitle>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  className="bg-teal-600 hover:bg-teal-500"
+                  onClick={() => {
+                    setMedSearchQuery(medName);
+                    setShowMedicationResults(false);
+                    setShowMedDialog(true);
+                  }}
                 >
-                  {medications?.filter((m: any) => m.isActive).length || 0}{" "}
-                  active
-                </Badge>
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadPrescription}
-                className="ml-auto border-border text-foreground hover:text-card-foreground hover:bg-muted"
-              >
-                <Printer className="w-4 h-4 mr-2" />
-                Download PDF
-              </Button>
+                  <Pill className="w-4 h-4 mr-2" />
+                  Add Medication
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadPrescription}
+                  className="border-border text-foreground hover:text-card-foreground hover:bg-muted"
+                >
+                  <Printer className="w-4 h-4 mr-2" />
+                  Download PDF
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loadingMeds ? (
@@ -862,7 +1136,7 @@ export default function PatientPage({
           </Card>
 
           <Card className="bg-card border-border">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-card-foreground flex items-center gap-2">
                 <Stethoscope className="w-5 h-5 text-emerald-500" />
                 Medical Visits
@@ -873,6 +1147,19 @@ export default function PatientPage({
                   {visits?.length || 0} visits
                 </Badge>
               </CardTitle>
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-500"
+                onClick={() => {
+                  setEditingVisitId(null);
+                  setVisitDiagnosis("");
+                  setVisitNotes("");
+                  setVisitDate(getDefaultVisitDate());
+                  setShowVisitDialog(true);
+                }}
+              >
+                <Stethoscope className="w-4 h-4 mr-2" />
+                New Visit
+              </Button>
             </CardHeader>
             <CardContent>
               {loadingVisits ? (
@@ -925,6 +1212,17 @@ export default function PatientPage({
                           </p>
                         </div>
                       )}
+                      <div className="mt-3 flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditVisit(visit)}
+                          className="border-border text-foreground hover:bg-background"
+                        >
+                          <Edit3 className="mr-2 h-4 w-4" />
+                          Edit Visit
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -937,7 +1235,88 @@ export default function PatientPage({
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-card-foreground flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-500" />
+                Document Requests
+                <Badge
+                  variant="secondary"
+                  className="ml-auto bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                >
+                  {documentRequests?.length || 0} requests
+                </Badge>
+              </CardTitle>
+              <Button
+                variant="outline"
+                className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                onClick={() => setShowRequestDialog(true)}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Request Document
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {loadingDocumentRequests ? (
+                <div className="animate-pulse space-y-3">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="h-20 bg-muted rounded-lg" />
+                  ))}
+                </div>
+              ) : documentRequests && documentRequests.length > 0 ? (
+                <div className="space-y-3">
+                  {documentRequests.map((request: any) => (
+                    <div
+                      key={request.id}
+                      className="rounded-xl border border-border bg-muted/60 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-medium text-card-foreground">
+                            {DOCUMENT_TYPE_LABELS[
+                              (request.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType
+                            ]}
+                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            <span>{formatDate(request.createdAt)}</span>
+                            <span>•</span>
+                            <span>
+                              {request.fulfilledRecordId
+                                ? "Linked to uploaded document"
+                                : "Waiting for patient upload"}
+                            </span>
+                          </div>
+                          {request.note && (
+                            <p className="mt-3 text-sm text-foreground">{request.note}</p>
+                          )}
+                        </div>
+                        <Badge
+                          variant={request.status === "fulfilled" ? "default" : "outline"}
+                          className={
+                            request.status === "fulfilled"
+                              ? "bg-emerald-600 text-white"
+                              : request.status === "cancelled"
+                                ? "border-red-300 text-red-600"
+                                : "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300"
+                          }
+                        >
+                          {DOCUMENT_REQUEST_STATUS_LABELS[
+                            request.status as keyof typeof DOCUMENT_REQUEST_STATUS_LABELS
+                          ]}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>No document requests yet</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-card-foreground flex items-center gap-2">
                 <FileText className="w-5 h-5 text-emerald-500" />
                 Patient Records
@@ -948,6 +1327,13 @@ export default function PatientPage({
                   {records?.length || 0} files
                 </Badge>
               </CardTitle>
+              <Button
+                className="bg-blue-600 hover:bg-blue-500"
+                onClick={() => setShowRecordDialog(true)}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Upload Record
+              </Button>
             </CardHeader>
             <CardContent>
               {loadingRecords ? (
@@ -956,50 +1342,90 @@ export default function PatientPage({
                     <div key={i} className="h-16 bg-muted rounded-lg" />
                   ))}
                 </div>
-              ) : records && records.length > 0 ? (
+              ) : groupedRecords.length > 0 ? (
                 <div className="space-y-3">
-                  {records.map((record: any) => (
-                    <div
-                      key={record.id}
-                      className="flex items-center justify-between p-4 bg-muted rounded-lg border border-border"
+                  {groupedRecords.map((group) => (
+                    <details
+                      key={group.value}
+                      open
+                      className="group overflow-hidden rounded-2xl border border-border bg-muted/30"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 rounded-lg bg-blue-500/20">
-                          <FileText className="w-5 h-5 text-blue-400" />
-                        </div>
-                        <div>
-                          <p className="text-card-foreground font-medium">
-                            {record.originalName}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{(record.size / 1024 / 1024).toFixed(2)} MB</span>
-                            <span>•</span>
-                            <span>{formatDate(record.createdAt)}</span>
-                            <span>•</span>
-                            <span>Dr. {record.doctor?.name || "Unknown"}</span>
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-600 dark:text-emerald-300">
+                            <FileText className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-card-foreground">{group.label}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {group.records.length} file{group.records.length > 1 ? "s" : ""}
+                            </p>
                           </div>
                         </div>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="space-y-3 border-t border-border/70 p-3">
+                        {group.records.map((record: any) => (
+                          <div
+                            key={record.id}
+                            className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card p-4"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="rounded-lg bg-blue-500/20 p-2">
+                                <FileText className="h-5 w-5 text-blue-400" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-card-foreground">
+                                  {record.originalName}
+                                </p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                  <span>{(record.size / 1024 / 1024).toFixed(2)} MB</span>
+                                  <span>•</span>
+                                  <span>{formatDate(record.createdAt)}</span>
+                                  <span>•</span>
+                                  <span>Dr. {record.doctor?.name || "Unknown"}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={(record.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType}
+                                onChange={(e) =>
+                                  updateRecordTypeMutation.mutate({
+                                    id: record.id,
+                                    documentType: e.target.value as DocumentType,
+                                  })
+                                }
+                                className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                              >
+                                {documentTypeOptions.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <a
+                                href={`/uploads/${record.fileName}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download={record.originalName}
+                                className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-blue-400"
+                              >
+                                <Download className="h-4 w-4" />
+                              </a>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => deleteRecordMutation.mutate({ id: record.id })}
+                                className="text-muted-foreground hover:text-red-400"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={`/uploads/${record.fileName}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download={record.originalName}
-                          className="p-2 text-muted-foreground hover:text-blue-400 rounded-md hover:bg-muted"
-                        >
-                          <Download className="w-4 h-4" />
-                        </a>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deleteRecordMutation.mutate({ id: record.id })}
-                          className="text-muted-foreground hover:text-red-400"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
+                    </details>
                   ))}
                 </div>
               ) : (

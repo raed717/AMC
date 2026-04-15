@@ -1,12 +1,36 @@
 import { protectedProcedure, router } from "../index";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@AMC/db";
-import { user, medicalVisits, medications, patientRecords } from "@AMC/db/schema/auth";
+import {
+  user,
+  medicalVisits,
+  medications,
+  patientRecords,
+  documentRequests,
+} from "@AMC/db/schema/auth";
+import {
+  DOCUMENT_TYPES,
+  DEFAULT_DOCUMENT_TYPE,
+  DOCUMENT_REQUEST_STATUSES,
+} from "@AMC/db/document-types";
+import { searchMedicationCatalog } from "@AMC/db/medication-catalog";
 import { z } from "zod";
 
 const generateId = () => crypto.randomUUID();
+const documentTypeEnum = z.enum(DOCUMENT_TYPES);
+const documentRequestStatusEnum = z.enum(DOCUMENT_REQUEST_STATUSES);
 
 export const patientRouter = router({
+  searchMedicationCatalog: protectedProcedure
+    .input(
+      z.object({
+        query: z.string().trim().min(1),
+      }),
+    )
+    .query(({ input }) => {
+      return searchMedicationCatalog(input.query);
+    }),
+
   getPatient: protectedProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ input }) => {
@@ -80,9 +104,34 @@ export const patientRouter = router({
             specialization: true,
           },
         },
+        uploader: {
+          columns: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
       },
     });
     return records;
+  }),
+
+  getMyDocumentRequests: protectedProcedure.query(async ({ ctx }) => {
+    const requests = await db.query.documentRequests.findMany({
+      where: eq(documentRequests.patientId, ctx.session.user.id),
+      orderBy: [desc(documentRequests.createdAt)],
+      with: {
+        doctor: {
+          columns: {
+            id: true,
+            name: true,
+            specialization: true,
+          },
+        },
+        fulfilledRecord: true,
+      },
+    });
+    return requests;
   }),
 
   getMyVisits: protectedProcedure.query(async ({ ctx }) => {
@@ -121,6 +170,27 @@ export const patientRouter = router({
         diagnosis: input.diagnosis || null,
       });
       return visit;
+    }),
+
+  updateVisit: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        notes: z.string().optional(),
+        diagnosis: z.string().optional(),
+        visitDate: z.string().datetime().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      await db
+        .update(medicalVisits)
+        .set({
+          notes: input.notes || null,
+          diagnosis: input.diagnosis || null,
+          visitDate: input.visitDate ? new Date(input.visitDate) : undefined,
+        })
+        .where(eq(medicalVisits.id, input.id));
+      return { success: true };
     }),
 
   createMedication: protectedProcedure
@@ -193,17 +263,93 @@ export const patientRouter = router({
             columns: {
               id: true,
               name: true,
+            specialization: true,
+          },
+        },
+        uploader: {
+          columns: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+      },
+    });
+    return records;
+  }),
+
+  getPatientDocumentRequests: protectedProcedure
+    .input(z.object({ patientId: z.string() }))
+    .query(async ({ input }) => {
+      const requests = await db.query.documentRequests.findMany({
+        where: eq(documentRequests.patientId, input.patientId),
+        orderBy: [desc(documentRequests.createdAt)],
+        with: {
+          doctor: {
+            columns: {
+              id: true,
+              name: true,
               specialization: true,
             },
           },
+          fulfilledRecord: true,
         },
       });
-      return records;
+      return requests;
+    }),
+
+  createDocumentRequest: protectedProcedure
+    .input(
+      z.object({
+        patientId: z.string(),
+        documentType: documentTypeEnum,
+        note: z.string().trim().max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await db.insert(documentRequests).values({
+        id: generateId(),
+        patientId: input.patientId,
+        doctorId: ctx.session.user.id,
+        documentType: input.documentType,
+        note: input.note || null,
+      });
+      return { success: true };
+    }),
+
+  updateRecordType: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        documentType: documentTypeEnum.default(DEFAULT_DOCUMENT_TYPE),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      await db
+        .update(patientRecords)
+        .set({ documentType: input.documentType })
+        .where(eq(patientRecords.id, input.id));
+      return { success: true };
+    }),
+
+  updateDocumentRequestStatus: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        status: documentRequestStatusEnum,
+      }),
+    )
+    .mutation(async ({ input }) => {
+      await db
+        .update(documentRequests)
+        .set({ status: input.status })
+        .where(eq(documentRequests.id, input.id));
+      return { success: true };
     }),
 
   deleteRecord: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       // In a real app we would check permissions and delete the file from disk too,
       // but for this prototype, we'll just delete the DB record.
       // The file will be orphaned in public/uploads but that's fine for now.
