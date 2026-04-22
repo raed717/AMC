@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
+  AlertCircle,
   Calendar,
   ChevronDown,
   Download,
@@ -31,7 +32,7 @@ import { trpc } from "@/utils/trpc";
 import {
   DOCUMENT_REQUEST_STATUS_LABELS,
   DEFAULT_DOCUMENT_TYPE,
-  DOCUMENT_TYPES,
+  DOCUMENT_TYPE_META,
   DOCUMENT_TYPE_LABELS,
   type DocumentType,
 } from "@AMC/db/document-types";
@@ -91,11 +92,6 @@ const isFutureVisit = (value: Date | string | null) => {
   return new Date(value).getTime() > Date.now();
 };
 
-const documentTypeOptions = DOCUMENT_TYPES.map((value) => ({
-  value,
-  label: DOCUMENT_TYPE_LABELS[value],
-}));
-
 registerPlugin(FilePondPluginImagePreview, FilePondPluginFileValidateSize);
 
 export default function ProfilePage() {
@@ -137,27 +133,39 @@ export default function ProfilePage() {
       visits: visits?.length ?? 0,
       records: records?.length ?? 0,
       diseases: patient?.chronicDiseases?.length ?? 0,
+      allergies: patient?.allergies?.length ?? 0,
     }),
-    [medications, patient?.chronicDiseases, records, visits],
+    [medications, patient?.allergies, patient?.chronicDiseases, records, visits],
   );
 
   const activeSectionMeta = sections.find((section) => section.id === activeSection)!;
   const groupedRecords = useMemo(() => {
-    const base = Object.fromEntries(
-      documentTypeOptions.map((option) => [option.value, [] as NonNullable<typeof records>[number][]]),
-    ) as Record<DocumentType, NonNullable<typeof records>[number][]>;
+    const groups = new Map<
+      string,
+      {
+        key: string;
+        label: string;
+        records: NonNullable<typeof records>[number][];
+      }
+    >();
 
     for (const record of records ?? []) {
-      const key = (record.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType;
-      base[key].push(record);
+      const type = (record.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType;
+      const meta = DOCUMENT_TYPE_META[type];
+      const groupKey = `${meta.family}__${meta.category}`;
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
+          key: groupKey,
+          label: `${meta.familyLabel} - ${meta.category}`,
+          records: [],
+        });
+      }
+
+      groups.get(groupKey)?.records.push(record);
     }
 
-    return documentTypeOptions
-      .map((option) => ({
-        ...option,
-        records: base[option.value],
-      }))
-      .filter((group) => group.records.length > 0);
+    return Array.from(groups.values());
   }, [records]);
 
   const openUploadForRequest = (requestId: string, documentType: DocumentType) => {
@@ -283,7 +291,9 @@ export default function ProfilePage() {
         }
       `}</style>
       <div>
-        <h1 className="text-3xl font-bold text-card-foreground">Patient Profile</h1>
+        <h1 className="text-3xl font-bold text-card-foreground">
+          Patient Profile
+        </h1>
         <p className="text-muted-foreground">
           A cleaner view of your personal health summary and documents.
         </p>
@@ -312,12 +322,17 @@ export default function ProfilePage() {
                   <h2 className="truncate text-2xl font-semibold text-card-foreground">
                     {user.name}
                   </h2>
-                  <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {user.email}
+                  </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
                       Patient
                     </Badge>
-                    <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300">
+                    <Badge
+                      variant="outline"
+                      className="border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
+                    >
                       {stats.activeMeds} active meds
                     </Badge>
                   </div>
@@ -326,12 +341,20 @@ export default function ProfilePage() {
 
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl border border-border/80 bg-background/70 p-3 dark:bg-background/40">
-                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Visits</p>
-                  <p className="mt-1 text-2xl font-semibold text-card-foreground">{stats.visits}</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    Visits
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold text-card-foreground">
+                    {stats.visits}
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-border/80 bg-background/70 p-3 dark:bg-background/40">
-                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Records</p>
-                  <p className="mt-1 text-2xl font-semibold text-card-foreground">{stats.records}</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    Records
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold text-card-foreground">
+                    {stats.records}
+                  </p>
                 </div>
               </div>
             </div>
@@ -364,7 +387,9 @@ export default function ProfilePage() {
                           <Icon className="h-4 w-4" />
                         </div>
                         <div>
-                          <p className="font-medium text-card-foreground">{section.label}</p>
+                          <p className="font-medium text-card-foreground">
+                            {section.label}
+                          </p>
                           <p className="mt-1 text-sm text-muted-foreground">
                             {section.description}
                           </p>
@@ -402,16 +427,22 @@ export default function ProfilePage() {
               <Card className="border-border bg-card">
                 <CardHeader className="flex flex-row items-center gap-3">
                   <User className="h-5 w-5 text-emerald-500" />
-                  <CardTitle className="text-lg text-card-foreground">Identity</CardTitle>
+                  <CardTitle className="text-lg text-card-foreground">
+                    Identity
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <p className="text-sm text-muted-foreground">Full name</p>
-                    <p className="mt-1 text-base font-medium text-foreground">{user.name}</p>
+                    <p className="mt-1 text-base font-medium text-foreground">
+                      {user.name}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="mt-1 text-base font-medium text-foreground">{user.email}</p>
+                    <p className="mt-1 text-base font-medium text-foreground">
+                      {user.email}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Birthday</p>
@@ -433,7 +464,9 @@ export default function ProfilePage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Patient ID</p>
-                    <p className="mt-1 break-all font-mono text-sm text-foreground">{user.id}</p>
+                    <p className="mt-1 break-all font-mono text-sm text-foreground">
+                      {user.id}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -441,25 +474,37 @@ export default function ProfilePage() {
               <Card className="border-border bg-card">
                 <CardHeader className="flex flex-row items-center gap-3">
                   <Shield className="h-5 w-5 text-emerald-500" />
-                  <CardTitle className="text-lg text-card-foreground">Account Status</CardTitle>
+                  <CardTitle className="text-lg text-card-foreground">
+                    Account Status
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <p className="text-sm text-muted-foreground">Role</p>
-                    <p className="mt-1 text-base font-medium text-foreground">Patient</p>
+                    <p className="mt-1 text-base font-medium text-foreground">
+                      Patient
+                    </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Email verified</p>
+                    <p className="text-sm text-muted-foreground">
+                      Email verified
+                    </p>
                     <p className="mt-1 text-base font-medium text-foreground">
                       {user.emailVerified ? "Yes" : "No"}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Account created</p>
-                    <p className="mt-1 text-base font-medium text-foreground">{createdAt}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Account created
+                    </p>
+                    <p className="mt-1 text-base font-medium text-foreground">
+                      {createdAt}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Profile image</p>
+                    <p className="text-sm text-muted-foreground">
+                      Profile image
+                    </p>
                     <p className="mt-1 text-base font-medium text-foreground">
                       {user.image ? "Uploaded" : "Not uploaded"}
                     </p>
@@ -507,6 +552,76 @@ export default function ProfilePage() {
               </Card>
 
               <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg text-card-foreground">
+                    <AlertCircle className="h-5 w-5 text-amber-500" />
+                    Allergies
+                    <Badge
+                      variant="secondary"
+                      className="ml-auto bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                    >
+                      {stats.allergies} listed
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {patient?.allergies?.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {patient.allergies.map((allergy) => (
+                        <Badge
+                          key={allergy}
+                          variant="outline"
+                          className="border-amber-300 bg-amber-500/10 px-3 py-1 text-amber-700 dark:border-amber-800 dark:text-amber-300"
+                        >
+                          {allergy}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center text-muted-foreground">
+                      <AlertCircle className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                      <p>No allergies recorded</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg text-card-foreground">
+                    <Activity className="h-5 w-5 text-amber-500" />
+                    Allergies
+                    <Badge
+                      variant="secondary"
+                      className="ml-auto bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                    >
+                      {patient?.allergies?.length ?? 0} listed
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {patient?.allergies?.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {patient.allergies.map((allergy) => (
+                        <Badge
+                          key={allergy}
+                          variant="outline"
+                          className="border-amber-300 bg-amber-500/10 px-3 py-1 text-amber-700 dark:border-amber-800 dark:text-amber-300"
+                        >
+                          {allergy}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center text-muted-foreground">
+                      <Activity className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                      <p>No allergies recorded</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-border bg-card">
                 <CardHeader className="flex flex-row items-center justify-between gap-3">
                   <CardTitle className="flex items-center gap-2 text-lg text-card-foreground">
                     <Pill className="h-5 w-5 text-emerald-500" />
@@ -526,14 +641,17 @@ export default function ProfilePage() {
                     className="border-border text-foreground hover:bg-accent hover:text-accent-foreground"
                   >
                     <Printer className="mr-2 h-4 w-4" />
-                    Download PDF
+                    Medical prescription
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {loadingMedications ? (
                     <div className="space-y-3">
                       {[1, 2].map((item) => (
-                        <div key={item} className="h-16 rounded-lg bg-muted animate-pulse" />
+                        <div
+                          key={item}
+                          className="h-16 rounded-lg bg-muted animate-pulse"
+                        />
                       ))}
                     </div>
                   ) : medications && medications.length > 0 ? (
@@ -545,22 +663,32 @@ export default function ProfilePage() {
                         >
                           <div className="flex items-start justify-between gap-4">
                             <div>
-                              <p className="font-medium text-foreground">{med.name}</p>
+                              <p className="font-medium text-foreground">
+                                {med.name}
+                              </p>
                               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                                 {med.dosage && <span>{med.dosage}</span>}
                                 <span>{formatFrequency(med.frequency)}</span>
                               </div>
-                              {(med.morningDose || med.nightDose || med.notes) && (
+                              {(med.morningDose ||
+                                med.nightDose ||
+                                med.notes) && (
                                 <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                                  {med.morningDose && <p>Morning: {med.morningDose}</p>}
-                                  {med.nightDose && <p>Night: {med.nightDose}</p>}
+                                  {med.morningDose && (
+                                    <p>Morning: {med.morningDose}</p>
+                                  )}
+                                  {med.nightDose && (
+                                    <p>Night: {med.nightDose}</p>
+                                  )}
                                   {med.notes && <p>Notes: {med.notes}</p>}
                                 </div>
                               )}
                             </div>
                             <Badge
                               variant={med.isActive ? "default" : "secondary"}
-                              className={med.isActive ? "bg-emerald-600 text-white" : ""}
+                              className={
+                                med.isActive ? "bg-emerald-600 text-white" : ""
+                              }
                             >
                               {med.isActive ? "Active" : "Inactive"}
                             </Badge>
@@ -594,7 +722,10 @@ export default function ProfilePage() {
                   {loadingVisits ? (
                     <div className="space-y-3">
                       {[1, 2].map((item) => (
-                        <div key={item} className="h-24 rounded-lg bg-muted animate-pulse" />
+                        <div
+                          key={item}
+                          className="h-24 rounded-lg bg-muted animate-pulse"
+                        />
                       ))}
                     </div>
                   ) : visits && visits.length > 0 ? (
@@ -609,7 +740,9 @@ export default function ProfilePage() {
                               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                                 <span>{formatDate(visit.visitDate)}</span>
                                 <span>•</span>
-                                <span>Dr. {visit.doctor?.name || "Unknown"}</span>
+                                <span>
+                                  Dr. {visit.doctor?.name || "Unknown"}
+                                </span>
                                 {visit.doctor?.specialization && (
                                   <>
                                     <span>•</span>
@@ -619,19 +752,31 @@ export default function ProfilePage() {
                               </div>
                               {visit.diagnosis && (
                                 <div>
-                                  <p className="text-sm text-muted-foreground">Diagnosis</p>
-                                  <p className="font-medium text-foreground">{visit.diagnosis}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Diagnosis
+                                  </p>
+                                  <p className="font-medium text-foreground">
+                                    {visit.diagnosis}
+                                  </p>
                                 </div>
                               )}
                               {visit.notes && (
                                 <div>
-                                  <p className="text-sm text-muted-foreground">Notes</p>
-                                  <p className="text-foreground">{visit.notes}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Notes
+                                  </p>
+                                  <p className="text-foreground">
+                                    {visit.notes}
+                                  </p>
                                 </div>
                               )}
                             </div>
                             <Badge
-                              variant={isFutureVisit(visit.visitDate) ? "default" : "outline"}
+                              variant={
+                                isFutureVisit(visit.visitDate)
+                                  ? "default"
+                                  : "outline"
+                              }
                               className={
                                 isFutureVisit(visit.visitDate)
                                   ? "bg-emerald-600 text-white"
@@ -676,7 +821,10 @@ export default function ProfilePage() {
                   {loadingDocumentRequests ? (
                     <div className="space-y-3">
                       {[1, 2].map((item) => (
-                        <div key={item} className="h-20 rounded-lg bg-muted animate-pulse" />
+                        <div
+                          key={item}
+                          className="h-20 rounded-lg bg-muted animate-pulse"
+                        />
                       ))}
                     </div>
                   ) : documentRequests && documentRequests.length > 0 ? (
@@ -690,12 +838,19 @@ export default function ProfilePage() {
                             <div>
                               <div className="flex flex-wrap items-center gap-2">
                                 <p className="font-medium text-foreground">
-                                  {DOCUMENT_TYPE_LABELS[
-                                    (request.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType
-                                  ]}
+                                  {
+                                    DOCUMENT_TYPE_LABELS[
+                                      (request.documentType ||
+                                        DEFAULT_DOCUMENT_TYPE) as DocumentType
+                                    ]
+                                  }
                                 </p>
                                 <Badge
-                                  variant={request.status === "fulfilled" ? "default" : "outline"}
+                                  variant={
+                                    request.status === "fulfilled"
+                                      ? "default"
+                                      : "outline"
+                                  }
                                   className={
                                     request.status === "fulfilled"
                                       ? "bg-emerald-600 text-white"
@@ -704,18 +859,24 @@ export default function ProfilePage() {
                                         : "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300"
                                   }
                                 >
-                                  {DOCUMENT_REQUEST_STATUS_LABELS[
-                                    request.status as keyof typeof DOCUMENT_REQUEST_STATUS_LABELS
-                                  ]}
+                                  {
+                                    DOCUMENT_REQUEST_STATUS_LABELS[
+                                      request.status as keyof typeof DOCUMENT_REQUEST_STATUS_LABELS
+                                    ]
+                                  }
                                 </Badge>
                               </div>
                               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                                <span>Dr. {request.doctor?.name || "Unknown"}</span>
+                                <span>
+                                  Dr. {request.doctor?.name || "Unknown"}
+                                </span>
                                 <span>•</span>
                                 <span>{formatDate(request.createdAt)}</span>
                               </div>
                               {request.note && (
-                                <p className="mt-3 text-sm text-foreground">{request.note}</p>
+                                <p className="mt-3 text-sm text-foreground">
+                                  {request.note}
+                                </p>
                               )}
                             </div>
                             {request.status === "pending" && (
@@ -724,7 +885,8 @@ export default function ProfilePage() {
                                 onClick={() =>
                                   openUploadForRequest(
                                     request.id,
-                                    (request.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType,
+                                    (request.documentType ||
+                                      DEFAULT_DOCUMENT_TYPE) as DocumentType,
                                   )
                                 }
                                 className="bg-emerald-600 text-white hover:bg-emerald-500"
@@ -762,14 +924,17 @@ export default function ProfilePage() {
                   {loadingRecords ? (
                     <div className="space-y-3">
                       {[1, 2].map((item) => (
-                        <div key={item} className="h-16 rounded-lg bg-muted animate-pulse" />
+                        <div
+                          key={item}
+                          className="h-16 rounded-lg bg-muted animate-pulse"
+                        />
                       ))}
                     </div>
                   ) : groupedRecords.length > 0 ? (
                     <div className="space-y-3">
                       {groupedRecords.map((group) => (
                         <details
-                          key={group.value}
+                          key={group.key}
                           open
                           className="group overflow-hidden rounded-2xl border border-border bg-muted/30"
                         >
@@ -779,9 +944,12 @@ export default function ProfilePage() {
                                 <FileText className="h-4 w-4" />
                               </div>
                               <div>
-                                <p className="font-medium text-card-foreground">{group.label}</p>
+                                <p className="font-medium text-card-foreground">
+                                  {group.label}
+                                </p>
                                 <p className="text-sm text-muted-foreground">
-                                  {group.records.length} file{group.records.length > 1 ? "s" : ""}
+                                  {group.records.length} file
+                                  {group.records.length > 1 ? "s" : ""}
                                 </p>
                               </div>
                             </div>
@@ -794,13 +962,30 @@ export default function ProfilePage() {
                                 className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
                               >
                                 <div>
-                                  <p className="font-medium text-foreground">{record.originalName}</p>
+                                  <p className="font-medium text-foreground">
+                                    {record.originalName}
+                                  </p>
+                                  <div className="mt-2">
+                                    <Badge
+                                      variant="outline"
+                                      className="border-emerald-300 bg-emerald-500/10 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
+                                    >
+                                      {DOCUMENT_TYPE_LABELS[
+                                        (record.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType
+                                      ]}
+                                    </Badge>
+                                  </div>
                                   <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                                    <span>{(record.size / 1024 / 1024).toFixed(2)} MB</span>
+                                    <span>
+                                      {(record.size / 1024 / 1024).toFixed(2)}{" "}
+                                      MB
+                                    </span>
                                     <span>•</span>
                                     <span>{formatDate(record.createdAt)}</span>
                                     <span>•</span>
-                                    <span>Dr. {record.doctor?.name || "Unknown"}</span>
+                                    <span>
+                                      Dr. {record.doctor?.name || "Unknown"}
+                                    </span>
                                     {record.uploader?.role === "patient" && (
                                       <>
                                         <span>•</span>
@@ -814,9 +999,12 @@ export default function ProfilePage() {
                                     variant="outline"
                                     className="border-emerald-300 bg-emerald-500/10 px-3 py-2 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
                                   >
-                                    {DOCUMENT_TYPE_LABELS[
-                                      (record.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType
-                                    ]}
+                                    {
+                                      DOCUMENT_TYPE_LABELS[
+                                        (record.documentType ||
+                                          DEFAULT_DOCUMENT_TYPE) as DocumentType
+                                      ]
+                                    }
                                   </Badge>
                                   <a
                                     href={`/uploads/${record.fileName}`}
@@ -843,14 +1031,19 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
 
-              <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+              <Dialog
+                open={showUploadDialog}
+                onOpenChange={setShowUploadDialog}
+              >
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Upload Requested Document</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm text-muted-foreground">Document Type</label>
+                      <label className="text-sm text-muted-foreground">
+                        Document Type
+                      </label>
                       <Input
                         value={DOCUMENT_TYPE_LABELS[selectedDocumentType]}
                         readOnly
@@ -868,7 +1061,10 @@ export default function ProfilePage() {
                           method: "POST",
                           ondata: (formData) => {
                             formData.append("patientId", user.id);
-                            formData.append("documentType", selectedDocumentType);
+                            formData.append(
+                              "documentType",
+                              selectedDocumentType,
+                            );
                             if (selectedRequestId) {
                               formData.append("requestId", selectedRequestId);
                             }
@@ -879,7 +1075,9 @@ export default function ProfilePage() {
                             setFiles([]);
                             setSelectedRequestId(null);
                             queryClient.invalidateQueries({
-                              queryKey: trpc.patient.getMyRecords.queryOptions().queryKey,
+                              queryKey:
+                                trpc.patient.getMyRecords.queryOptions()
+                                  .queryKey,
                             });
                             queryClient.invalidateQueries({
                               queryKey: documentRequestsQueryOptions.queryKey,

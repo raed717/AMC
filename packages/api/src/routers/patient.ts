@@ -55,6 +55,21 @@ export const patientRouter = router({
       return { success: true };
     }),
 
+  updateAllergies: protectedProcedure
+    .input(
+      z.object({
+        patientId: z.string(),
+        allergies: z.array(z.string()),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      await db
+        .update(user)
+        .set({ allergies: input.allergies })
+        .where(eq(user.id, input.patientId));
+      return { success: true };
+    }),
+
   getPatientVisits: protectedProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ input }) => {

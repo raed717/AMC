@@ -18,6 +18,7 @@ export const user = sqliteTable("user", {
   specialization: text("specialization"),
   phone: text("phone"),
   chronicDiseases: text("chronic_diseases", { mode: "json" }).$type<string[]>(),
+  allergies: text("allergies", { mode: "json" }).$type<string[]>(),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
     .notNull(),

@@ -4,7 +4,22 @@ import { use, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { trpc, trpcClient } from "@/utils/trpc";
 import { toast } from "sonner";
-import { FileText, Download, Trash2, User, Calendar, Pill, Stethoscope, AlertCircle, X, Activity, Edit3, CheckSquare, Printer, ChevronDown } from "lucide-react";
+import {
+  FileText,
+  Download,
+  Trash2,
+  User,
+  Calendar,
+  Pill,
+  Stethoscope,
+  AlertCircle,
+  X,
+  Activity,
+  Edit3,
+  CheckSquare,
+  Printer,
+  ChevronDown,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,9 +41,13 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
   DEFAULT_DOCUMENT_TYPE,
-  DOCUMENT_TYPES,
+  DOCUMENT_FAMILIES,
   DOCUMENT_REQUEST_STATUS_LABELS,
+  DOCUMENT_TYPE_META,
   DOCUMENT_TYPE_LABELS,
+  getDocumentCategories,
+  getDocumentOptionsForFamilyAndCategory,
+  type DocumentFamily,
   type DocumentType,
 } from "@AMC/db/document-types";
 
@@ -56,6 +75,21 @@ const COMMON_DISEASES = [
   "Osteoporosis",
 ];
 
+const COMMON_ALLERGIES = [
+  "Penicillin",
+  "Aspirin",
+  "NSAIDs",
+  "Sulfonamides",
+  "Latex",
+  "Peanuts",
+  "Shellfish",
+  "Eggs",
+  "Milk",
+  "Soy",
+  "Dust Mites",
+  "Pollen",
+];
+
 const getDefaultVisitDate = () => {
   const now = new Date();
   const offset = now.getTimezoneOffset();
@@ -63,10 +97,22 @@ const getDefaultVisitDate = () => {
   return localDate.toISOString().slice(0, 16);
 };
 
-const documentTypeOptions = DOCUMENT_TYPES.map((value) => ({
-  value,
-  label: DOCUMENT_TYPE_LABELS[value],
-}));
+const getInitialDocumentCategory = (family: DocumentFamily) =>
+  getDocumentCategories(family)[0] ?? "Other";
+
+const getInitialDocumentType = (family: DocumentFamily, category: string): DocumentType =>
+  (getDocumentOptionsForFamilyAndCategory(family, category)[0]?.value as DocumentType | undefined) ??
+  DEFAULT_DOCUMENT_TYPE;
+
+const getDocumentTypeOptions = (family: DocumentFamily, category: string) =>
+  getDocumentOptionsForFamilyAndCategory(family, category).map((option) => ({
+    value: option.value as DocumentType,
+    label: option.label,
+  }));
+
+const allDocumentTypeOptions = Object.entries(DOCUMENT_TYPE_LABELS).map(
+  ([value, label]) => ({ value: value as DocumentType, label }),
+);
 
 export default function PatientPage({
   params,
@@ -97,13 +143,14 @@ export default function PatientPage({
   const recordsQueryOptions = trpc.patient.getPatientRecords.queryOptions({
     patientId,
   });
-  const { data: records, isLoading: loadingRecords } = useQuery(recordsQueryOptions);
-  const documentRequestsQueryOptions = trpc.patient.getPatientDocumentRequests.queryOptions({
-    patientId,
-  });
-  const { data: documentRequests, isLoading: loadingDocumentRequests } = useQuery(
-    documentRequestsQueryOptions,
-  );
+  const { data: records, isLoading: loadingRecords } =
+    useQuery(recordsQueryOptions);
+  const documentRequestsQueryOptions =
+    trpc.patient.getPatientDocumentRequests.queryOptions({
+      patientId,
+    });
+  const { data: documentRequests, isLoading: loadingDocumentRequests } =
+    useQuery(documentRequestsQueryOptions);
 
   const { data: privateData } = useQuery(trpc.privateData.queryOptions());
   const doctor = privateData?.user;
@@ -147,6 +194,21 @@ export default function PatientPage({
         queryKey: patientQueryOptions.queryKey,
       });
       toast.success("Chronic diseases updated");
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+    },
+  });
+
+  const updateAllergiesMutation = useMutation({
+    mutationFn: async (data: { patientId: string; allergies: string[] }) => {
+      return trpcClient.patient.updateAllergies.mutate(data);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: patientQueryOptions.queryKey,
+      });
+      toast.success("Allergies updated");
     },
     onError: (error: any) => {
       toast.error(error.message);
@@ -301,19 +363,37 @@ export default function PatientPage({
   const [showMedDialog, setShowMedDialog] = useState(false);
   const [showRecordDialog, setShowRecordDialog] = useState(false);
   const [showRequestDialog, setShowRequestDialog] = useState(false);
+  const [documentActionMode, setDocumentActionMode] = useState<"request" | "upload">("request");
   const [showDiseasesDialog, setShowDiseasesDialog] = useState(false);
+  const [showAllergiesDialog, setShowAllergiesDialog] = useState(false);
   const [selectedDiseases, setSelectedDiseases] = useState<string[]>([]);
+  const [selectedAllergies, setSelectedAllergies] = useState<string[]>([]);
+  const [selectedDocumentFamily, setSelectedDocumentFamily] =
+    useState<DocumentFamily>("general");
+  const [selectedDocumentCategory, setSelectedDocumentCategory] = useState<string>(
+    getInitialDocumentCategory("general"),
+  );
   const [selectedDocumentType, setSelectedDocumentType] =
-    useState<DocumentType>(DEFAULT_DOCUMENT_TYPE);
-  const [requestedDocumentType, setRequestedDocumentType] =
-    useState<DocumentType>(DEFAULT_DOCUMENT_TYPE);
+    useState<DocumentType>(getInitialDocumentType("general", getInitialDocumentCategory("general")));
+  const [requestedDocumentFamily, setRequestedDocumentFamily] =
+    useState<DocumentFamily>("bon_de_labo");
+  const [requestedDocumentCategory, setRequestedDocumentCategory] = useState<string>(
+    getInitialDocumentCategory("bon_de_labo"),
+  );
+  const [requestedDocumentType, setRequestedDocumentType] = useState<DocumentType>(
+    getInitialDocumentType("bon_de_labo", getInitialDocumentCategory("bon_de_labo")),
+  );
   const [requestNote, setRequestNote] = useState("");
   const [files, setFiles] = useState<any[]>([]);
 
-  const medicationCatalogQueryOptions = trpc.patient.searchMedicationCatalog.queryOptions(
-    { query: medSearchQuery },
-  );
-  const { data: medicationSuggestions, isFetching: loadingMedicationSuggestions } = useQuery({
+  const medicationCatalogQueryOptions =
+    trpc.patient.searchMedicationCatalog.queryOptions({
+      query: medSearchQuery,
+    });
+  const {
+    data: medicationSuggestions,
+    isFetching: loadingMedicationSuggestions,
+  } = useQuery({
     ...medicationCatalogQueryOptions,
     enabled: medSearchQuery.trim().length >= 2,
   });
@@ -321,6 +401,11 @@ export default function PatientPage({
   const openDiseasesDialog = () => {
     setSelectedDiseases(patient?.chronicDiseases || []);
     setShowDiseasesDialog(true);
+  };
+
+  const openAllergiesDialog = () => {
+    setSelectedAllergies(patient?.allergies || []);
+    setShowAllergiesDialog(true);
   };
 
   const handleUpdateDiseases = async (e: React.FormEvent) => {
@@ -332,9 +417,18 @@ export default function PatientPage({
     setShowDiseasesDialog(false);
   };
 
+  const handleUpdateAllergies = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await updateAllergiesMutation.mutateAsync({
+      patientId,
+      allergies: selectedAllergies,
+    });
+    setShowAllergiesDialog(false);
+  };
+
   const handleDownloadPrescription = () => {
     if (!patient || !doctor) return;
-    
+
     const doc = new jsPDF();
     const activeMedications = medications?.filter((m: any) => m.isActive) || [];
 
@@ -343,7 +437,7 @@ export default function PatientPage({
     doc.setFontSize(24);
     doc.setTextColor(16, 185, 129); // Emerald-500
     doc.text("AMC", 14, 20);
-    
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139); // Slate-500
@@ -355,7 +449,7 @@ export default function PatientPage({
     doc.setFont("helvetica", "bold");
     const doctorName = `Dr. ${doctor.name}`;
     doc.text(doctorName, 196, 20, { align: "right" });
-    
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     if (doctor.specialization) {
@@ -379,8 +473,10 @@ export default function PatientPage({
     doc.text(`Name: ${patient.name}`, 14, 56);
     doc.text(`Age/Birthday: ${patient.birthday || "N/A"}`, 14, 62);
     doc.text(`Gender: ${patient.gender || "N/A"}`, 14, 68);
-    
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 196, 56, { align: "right" });
+
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 196, 56, {
+      align: "right",
+    });
 
     // Medications Table
     if (activeMedications.length > 0) {
@@ -394,8 +490,10 @@ export default function PatientPage({
           [
             med.morningDose ? `Morning: ${med.morningDose}` : "",
             med.nightDose ? `Night: ${med.nightDose}` : "",
-            med.notes || ""
-          ].filter(Boolean).join("\n") || "-"
+            med.notes || "",
+          ]
+            .filter(Boolean)
+            .join("\n") || "-",
         ]),
         theme: "striped",
         headStyles: { fillColor: [16, 185, 129] }, // Emerald-500
@@ -417,11 +515,13 @@ export default function PatientPage({
         "This is a computer-generated document. No signature is required.",
         105,
         285,
-        { align: "center" }
+        { align: "center" },
       );
     }
 
-    doc.save(`Prescription_${patient.name.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`);
+    doc.save(
+      `Prescription_${patient.name.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`,
+    );
   };
 
   const handleCreateVisit = async (e: React.FormEvent) => {
@@ -490,10 +590,7 @@ export default function PatientPage({
     setShowMedDialog(false);
   };
 
-  const handleSelectMedication = (entry: {
-    name: string;
-    dosage: string;
-  }) => {
+  const handleSelectMedication = (entry: { name: string; dosage: string }) => {
     setMedName(entry.name);
     setMedSearchQuery(entry.name);
     if (!medDosage) {
@@ -529,27 +626,61 @@ export default function PatientPage({
       documentType: requestedDocumentType,
       note: requestNote || undefined,
     });
-    setRequestedDocumentType(DEFAULT_DOCUMENT_TYPE);
+    const category = getInitialDocumentCategory(requestedDocumentFamily);
+    setRequestedDocumentCategory(category);
+    setRequestedDocumentType(
+      getInitialDocumentType(requestedDocumentFamily, category),
+    );
     setRequestNote("");
     setShowRequestDialog(false);
   };
 
+  const openRequestDialogForFamily = (family: Extract<DocumentFamily, "bon_de_labo" | "bon_de_radio">) => {
+    const category = getInitialDocumentCategory(family);
+    setRequestedDocumentFamily(family);
+    setRequestedDocumentCategory(category);
+    setRequestedDocumentType(getInitialDocumentType(family, category));
+    setDocumentActionMode("request");
+    setShowRequestDialog(true);
+  };
+
+  const openRecordDialogForFamily = (family: DocumentFamily) => {
+    const category = getInitialDocumentCategory(family);
+    setSelectedDocumentFamily(family);
+    setSelectedDocumentCategory(category);
+    setSelectedDocumentType(getInitialDocumentType(family, category));
+    setShowRecordDialog(true);
+  };
+
+  const selectedDocumentCategories = getDocumentCategories(selectedDocumentFamily);
+  const selectedDocumentTypeOptions = getDocumentTypeOptions(
+    selectedDocumentFamily,
+    selectedDocumentCategory,
+  );
+  const requestedDocumentCategories = getDocumentCategories(requestedDocumentFamily);
+  const requestedDocumentTypeOptions = getDocumentTypeOptions(
+    requestedDocumentFamily,
+    requestedDocumentCategory,
+  );
+
   const groupedRecords = useMemo(() => {
-    const base = Object.fromEntries(
-      documentTypeOptions.map((option) => [option.value, [] as any[]]),
-    ) as Record<DocumentType, any[]>;
+    const groups = new Map<string, { key: string; label: string; records: any[] }>();
 
     for (const record of records ?? []) {
-      const key = (record.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType;
-      base[key].push(record);
+      const type = (record.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType;
+      const meta = DOCUMENT_TYPE_META[type];
+      const groupKey = `${meta.family}__${meta.category}`;
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
+          key: groupKey,
+          label: `${meta.familyLabel} - ${meta.category}`,
+          records: [],
+        });
+      }
+      groups.get(groupKey)?.records.push(record);
     }
 
-    return documentTypeOptions
-      .map((option) => ({
-        ...option,
-        records: base[option.value],
-      }))
-      .filter((group) => group.records.length > 0);
+    return Array.from(groups.values());
   }, [records]);
 
   if (loadingPatient) {
@@ -573,148 +704,288 @@ export default function PatientPage({
     <div className="space-y-6">
       <div>
         <div>
-          <h1 className="text-3xl font-bold text-card-foreground">Patient Records</h1>
-          <p className="text-muted-foreground">Managing records for {patient.name}</p>
+          <h1 className="text-3xl font-bold text-card-foreground">
+            Patient Records
+          </h1>
+          <p className="text-muted-foreground">
+            Managing records for {patient.name}
+          </p>
         </div>
       </div>
 
       <Dialog open={showVisitDialog} onOpenChange={setShowVisitDialog}>
-            <DialogContent onClose={() => setShowVisitDialog(false)}>
-              <DialogHeader>
-                <DialogTitle>
-                  {editingVisitId ? "Edit Medical Visit" : "New Medical Visit"}
-                </DialogTitle>
-              </DialogHeader>
-               <form onSubmit={handleCreateVisit} className="space-y-4">
-                 <div>
-                   <label className="text-sm text-muted-foreground">Visit Date</label>
-                   <Input
-                     type="datetime-local"
-                     value={visitDate}
-                     onChange={(e) => setVisitDate(e.target.value)}
-                     className="bg-muted border-border text-foreground"
-                   />
-                 </div>
-                 <div>
-                   <label className="text-sm text-muted-foreground">Diagnosis</label>
-                   <Input
-                     value={visitDiagnosis}
-                     onChange={(e) => setVisitDiagnosis(e.target.value)}
-                     placeholder="Enter diagnosis"
-                     className="bg-muted border-border text-card-foreground"
-                   />
-                 </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Notes</label>
-                  <Textarea
-                    value={visitNotes}
-                    onChange={(e) => setVisitNotes(e.target.value)}
-                    placeholder="Enter visit notes"
-                    rows={4}
-                    className="bg-muted border-border text-card-foreground"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  disabled={createVisitMutation.isPending || updateVisitMutation.isPending}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500"
-                >
-                  {createVisitMutation.isPending || updateVisitMutation.isPending
-                    ? "Saving..."
-                    : editingVisitId
-                      ? "Update Visit"
-                      : "Save Visit"}
-                </Button>
-              </form>
-            </DialogContent>
+        <DialogContent onClose={() => setShowVisitDialog(false)}>
+          <DialogHeader>
+            <DialogTitle>
+              {editingVisitId ? "Edit Medical Visit" : "New Medical Visit"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateVisit} className="space-y-4">
+            <div>
+              <label className="text-sm text-muted-foreground">
+                Visit Date
+              </label>
+              <Input
+                type="datetime-local"
+                value={visitDate}
+                onChange={(e) => setVisitDate(e.target.value)}
+                className="bg-muted border-border text-foreground"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-muted-foreground">Diagnosis</label>
+              <Textarea
+                value={visitDiagnosis}
+                onChange={(e) => setVisitDiagnosis(e.target.value)}
+                placeholder="Enter diagnosis"
+                className="bg-muted border-border text-card-foreground"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Notes</label>
+              <Textarea
+                value={visitNotes}
+                onChange={(e) => setVisitNotes(e.target.value)}
+                placeholder="Enter visit notes"
+                rows={4}
+                className="bg-muted border-border text-card-foreground"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={
+                createVisitMutation.isPending || updateVisitMutation.isPending
+              }
+              className="w-full bg-emerald-600 hover:bg-emerald-500"
+            >
+              {createVisitMutation.isPending || updateVisitMutation.isPending
+                ? "Saving..."
+                : editingVisitId
+                  ? "Update Visit"
+                  : "Save Visit"}
+            </Button>
+          </form>
+        </DialogContent>
       </Dialog>
 
       <Dialog open={showRecordDialog} onOpenChange={setShowRecordDialog}>
-            <DialogContent onClose={() => setShowRecordDialog(false)}>
-              <DialogHeader>
-                <DialogTitle>Upload Patient Record</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm text-muted-foreground">Document Type</label>
-                  <select
-                    value={selectedDocumentType}
-                    onChange={(e) =>
-                      setSelectedDocumentType(e.target.value as DocumentType)
-                    }
-                    className="mt-2 w-full rounded-md border border-border bg-muted px-3 py-2 text-card-foreground"
-                  >
-                    {documentTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <FilePond
-                  files={files}
-                  onupdatefiles={setFiles}
-                  allowMultiple={false}
-                  maxFileSize="10MB"
-                  server={{
-                    process: {
-                      url: "/api/records/upload",
-                      method: "POST",
-                      headers: {
-                        // Any required headers
-                      },
-                      ondata: (formData) => {
-                        formData.append("patientId", patientId);
-                        formData.append("documentType", selectedDocumentType);
-                        return formData;
-                      },
-                      onload: (res) => {
-                        toast.success("File uploaded successfully");
-                        setShowRecordDialog(false);
-                        setFiles([]);
-                        setSelectedDocumentType(DEFAULT_DOCUMENT_TYPE);
-                        queryClient.invalidateQueries({
-                          queryKey: recordsQueryOptions.queryKey,
-                        });
-                        return res;
-                      },
-                      onerror: (err) => {
-                        toast.error("Upload failed");
-                        return err;
-                      },
-                    },
-                  }}
-                  name="file"
-                  labelIdle='Drag & Drop your files or <span class="filepond--label-action">Browse</span>'
-                />
-              </div>
-            </DialogContent>
+        <DialogContent onClose={() => setShowRecordDialog(false)}>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDocumentFamily === "bon_de_labo"
+                ? "Upload BON DE LABO"
+                : selectedDocumentFamily === "bon_de_radio"
+                  ? "Upload BON DE RADIO"
+                  : "Upload Patient Record"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-muted-foreground">
+                Document Family
+              </label>
+              <select
+                value={selectedDocumentFamily}
+                onChange={(e) => {
+                  const family = e.target.value as DocumentFamily;
+                  const category = getInitialDocumentCategory(family);
+                  setSelectedDocumentFamily(family);
+                  setSelectedDocumentCategory(category);
+                  setSelectedDocumentType(
+                    getInitialDocumentType(family, category),
+                  );
+                }}
+                className="mt-2 w-full rounded-md border border-border bg-muted px-3 py-2 text-card-foreground"
+              >
+                {DOCUMENT_FAMILIES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Category</label>
+              <select
+                value={selectedDocumentCategory}
+                onChange={(e) => {
+                  const category = e.target.value;
+                  setSelectedDocumentCategory(category);
+                  setSelectedDocumentType(
+                    getInitialDocumentType(selectedDocumentFamily, category),
+                  );
+                }}
+                className="mt-2 w-full rounded-md border border-border bg-muted px-3 py-2 text-card-foreground"
+              >
+                {selectedDocumentCategories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Record</label>
+              <select
+                value={selectedDocumentType}
+                onChange={(e) =>
+                  setSelectedDocumentType(e.target.value as DocumentType)
+                }
+                className="mt-2 w-full rounded-md border border-border bg-muted px-3 py-2 text-card-foreground"
+              >
+                {selectedDocumentTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <FilePond
+              files={files}
+              onupdatefiles={setFiles}
+              allowMultiple={false}
+              maxFileSize="10MB"
+              server={{
+                process: {
+                  url: "/api/records/upload",
+                  method: "POST",
+                  headers: {
+                    // Any required headers
+                  },
+                  ondata: (formData) => {
+                    formData.append("patientId", patientId);
+                    formData.append("documentType", selectedDocumentType);
+                    return formData;
+                  },
+                  onload: (res) => {
+                    toast.success("File uploaded successfully");
+                    setShowRecordDialog(false);
+                    setFiles([]);
+                    const category = getInitialDocumentCategory(
+                      selectedDocumentFamily,
+                    );
+                    setSelectedDocumentCategory(category);
+                    setSelectedDocumentType(
+                      getInitialDocumentType(selectedDocumentFamily, category),
+                    );
+                    queryClient.invalidateQueries({
+                      queryKey: recordsQueryOptions.queryKey,
+                    });
+                    return res;
+                  },
+                  onerror: (err) => {
+                    toast.error("Upload failed");
+                    return err;
+                  },
+                },
+              }}
+              name="file"
+              labelIdle='Drag & Drop your files or <span class="filepond--label-action">Browse</span>'
+            />
+          </div>
+        </DialogContent>
       </Dialog>
 
       <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
-            <DialogContent onClose={() => setShowRequestDialog(false)}>
-              <DialogHeader>
-                <DialogTitle>Request a Medical Document</DialogTitle>
-              </DialogHeader>
+        <DialogContent onClose={() => setShowRequestDialog(false)}>
+          <DialogHeader>
+            <DialogTitle>
+              {requestedDocumentFamily === "bon_de_radio"
+                ? "BON DE RADIO"
+                : "BON DE LABO"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted p-1">
+              <Button
+                type="button"
+                variant={documentActionMode === "request" ? "default" : "ghost"}
+                className={documentActionMode === "request" ? "bg-emerald-600 text-white hover:bg-emerald-500" : "text-foreground"}
+                onClick={() => setDocumentActionMode("request")}
+              >
+                Request
+              </Button>
+              <Button
+                type="button"
+                variant={documentActionMode === "upload" ? "default" : "ghost"}
+                className={documentActionMode === "upload" ? "bg-emerald-600 text-white hover:bg-emerald-500" : "text-foreground"}
+                onClick={() => setDocumentActionMode("upload")}
+              >
+                Upload
+              </Button>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">
+                Document Family
+              </label>
+              <select
+                value={requestedDocumentFamily}
+                onChange={(e) => {
+                  const family = e.target.value as DocumentFamily;
+                  const category = getInitialDocumentCategory(family);
+                  setRequestedDocumentFamily(family);
+                  setRequestedDocumentCategory(category);
+                  setRequestedDocumentType(
+                    getInitialDocumentType(family, category),
+                  );
+                }}
+                className="mt-2 w-full rounded-md border border-border bg-muted px-3 py-2 text-card-foreground"
+              >
+                {DOCUMENT_FAMILIES.filter(
+                  (family) => family.value !== "general",
+                ).map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Category</label>
+              <select
+                value={requestedDocumentCategory}
+                onChange={(e) => {
+                  const category = e.target.value;
+                  setRequestedDocumentCategory(category);
+                  setRequestedDocumentType(
+                    getInitialDocumentType(requestedDocumentFamily, category),
+                  );
+                }}
+                className="mt-2 w-full rounded-md border border-border bg-muted px-3 py-2 text-card-foreground"
+              >
+                {requestedDocumentCategories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">
+                {documentActionMode === "request" ? "Requested Record" : "Record"}
+              </label>
+              <select
+                value={requestedDocumentType}
+                onChange={(e) =>
+                  setRequestedDocumentType(e.target.value as DocumentType)
+                }
+                className="mt-2 w-full rounded-md border border-border bg-muted px-3 py-2 text-card-foreground"
+              >
+                {requestedDocumentTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {documentActionMode === "request" ? (
               <form onSubmit={handleCreateDocumentRequest} className="space-y-4">
                 <div>
-                  <label className="text-sm text-muted-foreground">Document Type</label>
-                  <select
-                    value={requestedDocumentType}
-                    onChange={(e) =>
-                      setRequestedDocumentType(e.target.value as DocumentType)
-                    }
-                    className="mt-2 w-full rounded-md border border-border bg-muted px-3 py-2 text-card-foreground"
-                  >
-                    {documentTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Doctor Note</label>
+                  <label className="text-sm text-muted-foreground">
+                    Doctor Note
+                  </label>
                   <Textarea
                     value={requestNote}
                     onChange={(e) => setRequestNote(e.target.value)}
@@ -733,153 +1004,197 @@ export default function PatientPage({
                     : "Send Request"}
                 </Button>
               </form>
-            </DialogContent>
+            ) : (
+              <FilePond
+                files={files}
+                onupdatefiles={setFiles}
+                allowMultiple={false}
+                maxFileSize="10MB"
+                server={{
+                  process: {
+                    url: "/api/records/upload",
+                    method: "POST",
+                    ondata: (formData) => {
+                      formData.append("patientId", patientId);
+                      formData.append("documentType", requestedDocumentType);
+                      return formData;
+                    },
+                    onload: (res) => {
+                      toast.success("File uploaded successfully");
+                      setShowRequestDialog(false);
+                      setFiles([]);
+                      queryClient.invalidateQueries({
+                        queryKey: recordsQueryOptions.queryKey,
+                      });
+                      return res;
+                    },
+                    onerror: (err) => {
+                      toast.error("Upload failed");
+                      return err;
+                    },
+                  },
+                }}
+                name="file"
+                labelIdle='Drag & Drop your file or <span class="filepond--label-action">Browse</span>'
+              />
+            )}
+          </div>
+        </DialogContent>
       </Dialog>
 
       <Dialog open={showMedDialog} onOpenChange={setShowMedDialog}>
-            <DialogContent onClose={() => setShowMedDialog(false)}>
-              <DialogHeader>
-                <DialogTitle>Add Medication</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreateMedication} className="space-y-4">
-                <div>
-                  <label className="text-sm text-muted-foreground">
-                    Search Medication *
-                  </label>
-                  <div className="relative">
-                    <Input
-                      value={medSearchQuery}
-                      onChange={(e) => {
-                        setMedSearchQuery(e.target.value);
-                        setMedName(e.target.value);
-                        setShowMedicationResults(true);
-                      }}
-                      onFocus={() => setShowMedicationResults(true)}
-                      placeholder="Search by name, dosage, DCI, or laboratory"
-                      className="bg-muted border-border text-card-foreground"
-                    />
-                    {showMedicationResults && medSearchQuery.trim().length >= 2 && (
-                      <div className="absolute z-20 mt-2 max-h-64 w-full overflow-auto rounded-xl border border-border bg-card p-2 shadow-xl">
-                        {loadingMedicationSuggestions ? (
-                          <div className="px-3 py-4 text-sm text-muted-foreground">
-                            Searching medications...
-                          </div>
-                        ) : medicationSuggestions && medicationSuggestions.length > 0 ? (
-                          <div className="space-y-1">
-                            {medicationSuggestions.map((entry) => (
-                              <button
-                                key={entry.id}
-                                type="button"
-                                onClick={() => handleSelectMedication(entry)}
-                                className="w-full rounded-lg border border-transparent px-3 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/70 dark:hover:border-emerald-900 dark:hover:bg-emerald-950/30"
-                              >
-                                <div className="flex items-center justify-between gap-3">
-                                  <p className="font-medium text-foreground">{entry.name}</p>
-                                  {entry.dosage && (
-                                    <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300">
-                                      {entry.dosage}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                  {entry.form && <span>{entry.form}</span>}
-                                  {entry.dci && (
-                                    <>
-                                      <span>•</span>
-                                      <span>{entry.dci}</span>
-                                    </>
-                                  )}
-                                  {entry.laboratory && (
-                                    <>
-                                      <span>•</span>
-                                      <span>{entry.laboratory}</span>
-                                    </>
-                                  )}
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="px-3 py-4 text-sm text-muted-foreground">
-                            No medications found.
-                          </div>
-                        )}
+        <DialogContent onClose={() => setShowMedDialog(false)}>
+          <DialogHeader>
+            <DialogTitle>Add Medication</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateMedication} className="space-y-4">
+            <div>
+              <label className="text-sm text-muted-foreground">
+                Search Medication *
+              </label>
+              <div className="relative">
+                <Input
+                  value={medSearchQuery}
+                  onChange={(e) => {
+                    setMedSearchQuery(e.target.value);
+                    setMedName(e.target.value);
+                    setShowMedicationResults(true);
+                  }}
+                  onFocus={() => setShowMedicationResults(true)}
+                  placeholder="Search by name, dosage, DCI, or laboratory"
+                  className="bg-muted border-border text-card-foreground"
+                />
+                {showMedicationResults && medSearchQuery.trim().length >= 2 && (
+                  <div className="absolute z-20 mt-2 max-h-64 w-full overflow-auto rounded-xl border border-border bg-card p-2 shadow-xl">
+                    {loadingMedicationSuggestions ? (
+                      <div className="px-3 py-4 text-sm text-muted-foreground">
+                        Searching medications...
+                      </div>
+                    ) : medicationSuggestions &&
+                      medicationSuggestions.length > 0 ? (
+                      <div className="space-y-1">
+                        {medicationSuggestions.map((entry) => (
+                          <button
+                            key={entry.id}
+                            type="button"
+                            onClick={() => handleSelectMedication(entry)}
+                            className="w-full rounded-lg border border-transparent px-3 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/70 dark:hover:border-emerald-900 dark:hover:bg-emerald-950/30"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="font-medium text-foreground">
+                                {entry.name}
+                              </p>
+                              {entry.dosage && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
+                                >
+                                  {entry.dosage}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              {entry.form && <span>{entry.form}</span>}
+                              {entry.dci && (
+                                <>
+                                  <span>•</span>
+                                  <span>{entry.dci}</span>
+                                </>
+                              )}
+                              {entry.laboratory && (
+                                <>
+                                  <span>•</span>
+                                  <span>{entry.laboratory}</span>
+                                </>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="px-3 py-4 text-sm text-muted-foreground">
+                        No medications found.
                       </div>
                     )}
                   </div>
-                  {medName && (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Selected medication: <span className="font-medium text-foreground">{medName}</span>
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Dosage</label>
-                  <Input
-                    value={medDosage}
-                    onChange={(e) => setMedDosage(e.target.value)}
-                    placeholder="e.g., 500mg"
-                    className="bg-muted border-border text-card-foreground"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Frequency</label>
-                  <select
-                    value={medFrequency}
-                    onChange={(e) => setMedFrequency(e.target.value)}
-                    className="w-full bg-muted border-border rounded-md px-3 py-2 text-card-foreground"
-                  >
-                    {FREQUENCIES.map((f) => (
-                      <option key={f.value} value={f.value}>
-                        {f.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm text-muted-foreground">
-                      Morning Dose
-                    </label>
-                    <Input
-                      value={medMorningDose}
-                      onChange={(e) => setMedMorningDose(e.target.value)}
-                      placeholder="e.g., 1 pill"
-                      className="bg-muted border-border text-card-foreground"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Night Dose</label>
-                    <Input
-                      value={medNightDose}
-                      onChange={(e) => setMedNightDose(e.target.value)}
-                      placeholder="e.g., 1 pill"
-                      className="bg-muted border-border text-card-foreground"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Notes</label>
-                  <Textarea
-                    value={medNotes}
-                    onChange={(e) => setMedNotes(e.target.value)}
-                    placeholder="Additional notes"
-                    rows={2}
-                    className="bg-muted border-border text-card-foreground"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  disabled={createMedMutation.isPending || !medName}
-                  className="w-full bg-teal-600 hover:bg-teal-500"
-                >
-                  {createMedMutation.isPending ? "Saving..." : "Add Medication"}
-                </Button>
-              </form>
-            </DialogContent>
+                )}
+              </div>
+              {medName && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Selected medication:{" "}
+                  <span className="font-medium text-foreground">{medName}</span>
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Dosage</label>
+              <Input
+                value={medDosage}
+                onChange={(e) => setMedDosage(e.target.value)}
+                placeholder="e.g., 500mg"
+                className="bg-muted border-border text-card-foreground"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Frequency</label>
+              <select
+                value={medFrequency}
+                onChange={(e) => setMedFrequency(e.target.value)}
+                className="w-full bg-muted border-border rounded-md px-3 py-2 text-card-foreground"
+              >
+                {FREQUENCIES.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-muted-foreground">
+                  Morning Dose
+                </label>
+                <Input
+                  value={medMorningDose}
+                  onChange={(e) => setMedMorningDose(e.target.value)}
+                  placeholder="e.g., 1 pill"
+                  className="bg-muted border-border text-card-foreground"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">
+                  Night Dose
+                </label>
+                <Input
+                  value={medNightDose}
+                  onChange={(e) => setMedNightDose(e.target.value)}
+                  placeholder="e.g., 1 pill"
+                  className="bg-muted border-border text-card-foreground"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Notes</label>
+              <Textarea
+                value={medNotes}
+                onChange={(e) => setMedNotes(e.target.value)}
+                placeholder="Additional notes"
+                rows={2}
+                className="bg-muted border-border text-card-foreground"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={createMedMutation.isPending || !medName}
+              className="w-full bg-teal-600 hover:bg-teal-500"
+            >
+              {createMedMutation.isPending ? "Saving..." : "Add Medication"}
+            </Button>
+          </form>
+        </DialogContent>
       </Dialog>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_280px]">
         <div className="lg:col-span-1">
           <Card className="bg-card border-border">
             <CardHeader>
@@ -890,8 +1205,12 @@ export default function PatientPage({
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="text-sm text-muted-foreground">Full Name</label>
-                <p className="text-card-foreground font-medium">{patient.name}</p>
+                <label className="text-sm text-muted-foreground">
+                  Full Name
+                </label>
+                <p className="text-card-foreground font-medium">
+                  {patient.name}
+                </p>
               </div>
               <div>
                 <label className="text-sm text-muted-foreground">Email</label>
@@ -910,14 +1229,20 @@ export default function PatientPage({
                 </p>
               </div>
               <div>
-                <label className="text-sm text-muted-foreground">Birthday</label>
+                <label className="text-sm text-muted-foreground">
+                  Birthday
+                </label>
                 <p className="text-card-foreground">
                   {patient.birthday || "Not provided"}
                 </p>
               </div>
               <div>
-                <label className="text-sm text-muted-foreground">Patient ID</label>
-                <p className="text-card-foreground font-mono text-xs">{patient.id}</p>
+                <label className="text-sm text-muted-foreground">
+                  Patient ID
+                </label>
+                <p className="text-card-foreground font-mono text-xs">
+                  {patient.id}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -959,7 +1284,47 @@ export default function PatientPage({
             </CardContent>
           </Card>
 
-          <Dialog open={showDiseasesDialog} onOpenChange={setShowDiseasesDialog}>
+          <Card className="bg-card border-border mt-6">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-card-foreground flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-500" />
+                Allergies
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={openAllergiesDialog}
+                className="text-muted-foreground hover:text-emerald-400"
+              >
+                <Edit3 className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {patient.allergies && patient.allergies.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {patient.allergies.map((allergy: string) => (
+                    <Badge
+                      key={allergy}
+                      className="border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                      variant="outline"
+                    >
+                      {allergy}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <AlertCircle className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                  <p className="text-sm">No allergies recorded</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Dialog
+            open={showDiseasesDialog}
+            onOpenChange={setShowDiseasesDialog}
+          >
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Manage Chronic Diseases</DialogTitle>
@@ -984,11 +1349,15 @@ export default function PatientPage({
                               : "border-border bg-card"
                           }`}
                         >
-                          {isSelected && <CheckSquare className="w-3.5 h-3.5 text-foreground" />}
+                          {isSelected && (
+                            <CheckSquare className="w-3.5 h-3.5 text-foreground" />
+                          )}
                         </div>
                         <span
                           className={`text-sm ${
-                            isSelected ? "text-card-foreground" : "text-muted-foreground"
+                            isSelected
+                              ? "text-card-foreground"
+                              : "text-muted-foreground"
                           }`}
                         >
                           {disease}
@@ -999,10 +1368,13 @@ export default function PatientPage({
                           checked={isSelected}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedDiseases([...selectedDiseases, disease]);
+                              setSelectedDiseases([
+                                ...selectedDiseases,
+                                disease,
+                              ]);
                             } else {
                               setSelectedDiseases(
-                                selectedDiseases.filter((d) => d !== disease)
+                                selectedDiseases.filter((d) => d !== disease),
                               );
                             }
                           }}
@@ -1016,16 +1388,183 @@ export default function PatientPage({
                   disabled={updateDiseasesMutation.isPending}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 mt-4"
                 >
-                  {updateDiseasesMutation.isPending ? "Saving..." : "Save Diseases"}
+                  {updateDiseasesMutation.isPending
+                    ? "Saving..."
+                    : "Save Diseases"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={showAllergiesDialog}
+            onOpenChange={setShowAllergiesDialog}
+          >
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Manage Allergies</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleUpdateAllergies} className="space-y-4">
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {COMMON_ALLERGIES.map((allergy) => {
+                    const isSelected = selectedAllergies.includes(allergy);
+                    return (
+                      <label
+                        key={allergy}
+                        className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                          isSelected
+                            ? "border-amber-500/50 bg-amber-500/10"
+                            : "border-border bg-muted hover:bg-muted"
+                        }`}
+                      >
+                        <div
+                          className={`flex h-5 w-5 items-center justify-center rounded border ${
+                            isSelected
+                              ? "border-amber-500 bg-amber-500"
+                              : "border-border bg-card"
+                          }`}
+                        >
+                          {isSelected && (
+                            <CheckSquare className="h-3.5 w-3.5 text-foreground" />
+                          )}
+                        </div>
+                        <span
+                          className={`text-sm ${
+                            isSelected
+                              ? "text-card-foreground"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {allergy}
+                        </span>
+                        <input
+                          type="checkbox"
+                          className="hidden"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedAllergies([
+                                ...selectedAllergies,
+                                allergy,
+                              ]);
+                            } else {
+                              setSelectedAllergies(
+                                selectedAllergies.filter(
+                                  (item) => item !== allergy,
+                                ),
+                              );
+                            }
+                          }}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+                <Button
+                  type="submit"
+                  disabled={updateAllergiesMutation.isPending}
+                  className="mt-4 w-full bg-emerald-600 hover:bg-emerald-500"
+                >
+                  {updateAllergiesMutation.isPending
+                    ? "Saving..."
+                    : "Save Allergies"}
                 </Button>
               </form>
             </DialogContent>
           </Dialog>
         </div>
 
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6">
           <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-card-foreground flex items-center gap-2">
+                <Stethoscope className="w-5 h-5 text-emerald-500" />
+                Medical Visits
+                <Badge
+                  variant="secondary"
+                  className="ml-auto bg-teal-500/20 text-teal-400"
+                >
+                  {visits?.length || 0} visits
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingVisits ? (
+                <div className="animate-pulse space-y-3">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="h-24 bg-muted rounded-lg" />
+                  ))}
+                </div>
+              ) : visits && visits.length > 0 ? (
+                <div className="space-y-3">
+                  {visits.map((visit: any) => (
+                    <div
+                      key={visit.id}
+                      className="p-4 bg-muted rounded-lg border border-border"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="w-4 h-4" />
+                          <span className="text-sm">
+                            {formatDate(visit.visitDate)}
+                          </span>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className="border-border text-muted-foreground"
+                        >
+                          Dr. {visit.doctor?.name || "Unknown"}
+                        </Badge>
+                        {isFutureVisit(visit.visitDate) && (
+                          <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                            Coming Appointment
+                          </Badge>
+                        )}
+                      </div>
+                      {visit.diagnosis && (
+                        <div className="mb-2">
+                          <label className="text-sm text-muted-foreground">
+                            Diagnosis
+                          </label>
+                          <p className="text-card-foreground">
+                            {visit.diagnosis}
+                          </p>
+                        </div>
+                      )}
+                      {visit.notes && (
+                        <div>
+                          <label className="text-sm text-muted-foreground">
+                            Notes
+                          </label>
+                          <p className="text-foreground text-sm">
+                            {visit.notes}
+                          </p>
+                        </div>
+                      )}
+                      <div className="mt-3 flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditVisit(visit)}
+                          className="border-border text-foreground hover:bg-background"
+                        >
+                          <Edit3 className="mr-2 h-4 w-4" />
+                          Edit Visit
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Stethoscope className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>No medical visits recorded</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 <CardTitle className="text-card-foreground flex items-center gap-2">
                   <Pill className="w-5 h-5 text-emerald-500" />
@@ -1038,28 +1577,6 @@ export default function PatientPage({
                     active
                   </Badge>
                 </CardTitle>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  className="bg-teal-600 hover:bg-teal-500"
-                  onClick={() => {
-                    setMedSearchQuery(medName);
-                    setShowMedicationResults(false);
-                    setShowMedDialog(true);
-                  }}
-                >
-                  <Pill className="w-4 h-4 mr-2" />
-                  Add Medication
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadPrescription}
-                  className="border-border text-foreground hover:text-card-foreground hover:bg-muted"
-                >
-                  <Printer className="w-4 h-4 mr-2" />
-                  Download PDF
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -1136,106 +1653,7 @@ export default function PatientPage({
           </Card>
 
           <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-card-foreground flex items-center gap-2">
-                <Stethoscope className="w-5 h-5 text-emerald-500" />
-                Medical Visits
-                <Badge
-                  variant="secondary"
-                  className="ml-auto bg-teal-500/20 text-teal-400"
-                >
-                  {visits?.length || 0} visits
-                </Badge>
-              </CardTitle>
-              <Button
-                className="bg-emerald-600 hover:bg-emerald-500"
-                onClick={() => {
-                  setEditingVisitId(null);
-                  setVisitDiagnosis("");
-                  setVisitNotes("");
-                  setVisitDate(getDefaultVisitDate());
-                  setShowVisitDialog(true);
-                }}
-              >
-                <Stethoscope className="w-4 h-4 mr-2" />
-                New Visit
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {loadingVisits ? (
-                <div className="animate-pulse space-y-3">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="h-24 bg-muted rounded-lg" />
-                  ))}
-                </div>
-              ) : visits && visits.length > 0 ? (
-                <div className="space-y-3">
-                  {visits.map((visit: any) => (
-                    <div
-                      key={visit.id}
-                      className="p-4 bg-muted rounded-lg border border-border"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Calendar className="w-4 h-4" />
-                          <span className="text-sm">
-                            {formatDate(visit.visitDate)}
-                          </span>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className="border-border text-muted-foreground"
-                        >
-                          Dr. {visit.doctor?.name || "Unknown"}
-                        </Badge>
-                        {isFutureVisit(visit.visitDate) && (
-                          <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
-                            Coming Appointment
-                          </Badge>
-                        )}
-                      </div>
-                      {visit.diagnosis && (
-                        <div className="mb-2">
-                          <label className="text-sm text-muted-foreground">
-                            Diagnosis
-                          </label>
-                          <p className="text-card-foreground">{visit.diagnosis}</p>
-                        </div>
-                      )}
-                      {visit.notes && (
-                        <div>
-                          <label className="text-sm text-muted-foreground">
-                            Notes
-                          </label>
-                          <p className="text-foreground text-sm">
-                            {visit.notes}
-                          </p>
-                        </div>
-                      )}
-                      <div className="mt-3 flex justify-end">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditVisit(visit)}
-                          className="border-border text-foreground hover:bg-background"
-                        >
-                          <Edit3 className="mr-2 h-4 w-4" />
-                          Edit Visit
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Stethoscope className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>No medical visits recorded</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardHeader className="pb-2">
               <CardTitle className="text-card-foreground flex items-center gap-2">
                 <FileText className="w-5 h-5 text-emerald-500" />
                 Document Requests
@@ -1246,14 +1664,6 @@ export default function PatientPage({
                   {documentRequests?.length || 0} requests
                 </Badge>
               </CardTitle>
-              <Button
-                variant="outline"
-                className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
-                onClick={() => setShowRequestDialog(true)}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Request Document
-              </Button>
             </CardHeader>
             <CardContent>
               {loadingDocumentRequests ? (
@@ -1272,9 +1682,12 @@ export default function PatientPage({
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="font-medium text-card-foreground">
-                            {DOCUMENT_TYPE_LABELS[
-                              (request.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType
-                            ]}
+                            {
+                              DOCUMENT_TYPE_LABELS[
+                                (request.documentType ||
+                                  DEFAULT_DOCUMENT_TYPE) as DocumentType
+                              ]
+                            }
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                             <span>{formatDate(request.createdAt)}</span>
@@ -1286,11 +1699,17 @@ export default function PatientPage({
                             </span>
                           </div>
                           {request.note && (
-                            <p className="mt-3 text-sm text-foreground">{request.note}</p>
+                            <p className="mt-3 text-sm text-foreground">
+                              {request.note}
+                            </p>
                           )}
                         </div>
                         <Badge
-                          variant={request.status === "fulfilled" ? "default" : "outline"}
+                          variant={
+                            request.status === "fulfilled"
+                              ? "default"
+                              : "outline"
+                          }
                           className={
                             request.status === "fulfilled"
                               ? "bg-emerald-600 text-white"
@@ -1299,9 +1718,11 @@ export default function PatientPage({
                                 : "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300"
                           }
                         >
-                          {DOCUMENT_REQUEST_STATUS_LABELS[
-                            request.status as keyof typeof DOCUMENT_REQUEST_STATUS_LABELS
-                          ]}
+                          {
+                            DOCUMENT_REQUEST_STATUS_LABELS[
+                              request.status as keyof typeof DOCUMENT_REQUEST_STATUS_LABELS
+                            ]
+                          }
                         </Badge>
                       </div>
                     </div>
@@ -1316,7 +1737,7 @@ export default function PatientPage({
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardHeader className="pb-2">
               <CardTitle className="text-card-foreground flex items-center gap-2">
                 <FileText className="w-5 h-5 text-emerald-500" />
                 Patient Records
@@ -1327,13 +1748,6 @@ export default function PatientPage({
                   {records?.length || 0} files
                 </Badge>
               </CardTitle>
-              <Button
-                className="bg-blue-600 hover:bg-blue-500"
-                onClick={() => setShowRecordDialog(true)}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Upload Record
-              </Button>
             </CardHeader>
             <CardContent>
               {loadingRecords ? (
@@ -1346,7 +1760,7 @@ export default function PatientPage({
                 <div className="space-y-3">
                   {groupedRecords.map((group) => (
                     <details
-                      key={group.value}
+                      key={group.key}
                       open
                       className="group overflow-hidden rounded-2xl border border-border bg-muted/30"
                     >
@@ -1356,9 +1770,12 @@ export default function PatientPage({
                             <FileText className="h-4 w-4" />
                           </div>
                           <div>
-                            <p className="font-medium text-card-foreground">{group.label}</p>
+                            <p className="font-medium text-card-foreground">
+                              {group.label}
+                            </p>
                             <p className="text-sm text-muted-foreground">
-                              {group.records.length} file{group.records.length > 1 ? "s" : ""}
+                              {group.records.length} file
+                              {group.records.length > 1 ? "s" : ""}
                             </p>
                           </div>
                         </div>
@@ -1378,28 +1795,52 @@ export default function PatientPage({
                                 <p className="font-medium text-card-foreground">
                                   {record.originalName}
                                 </p>
+                                <div className="mt-2">
+                                  <Badge
+                                    variant="outline"
+                                    className="border-emerald-300 bg-emerald-500/10 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
+                                  >
+                                    {
+                                      DOCUMENT_TYPE_LABELS[
+                                        (record.documentType ||
+                                          DEFAULT_DOCUMENT_TYPE) as DocumentType
+                                      ]
+                                    }
+                                  </Badge>
+                                </div>
                                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                  <span>{(record.size / 1024 / 1024).toFixed(2)} MB</span>
+                                  <span>
+                                    {(record.size / 1024 / 1024).toFixed(2)} MB
+                                  </span>
                                   <span>•</span>
                                   <span>{formatDate(record.createdAt)}</span>
                                   <span>•</span>
-                                  <span>Dr. {record.doctor?.name || "Unknown"}</span>
+                                  <span>
+                                    Dr. {record.doctor?.name || "Unknown"}
+                                  </span>
                                 </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
                               <select
-                                value={(record.documentType || DEFAULT_DOCUMENT_TYPE) as DocumentType}
+                                value={
+                                  (record.documentType ||
+                                    DEFAULT_DOCUMENT_TYPE) as DocumentType
+                                }
                                 onChange={(e) =>
                                   updateRecordTypeMutation.mutate({
                                     id: record.id,
-                                    documentType: e.target.value as DocumentType,
+                                    documentType: e.target
+                                      .value as DocumentType,
                                   })
                                 }
                                 className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
                               >
-                                {documentTypeOptions.map((option) => (
-                                  <option key={option.value} value={option.value}>
+                                {allDocumentTypeOptions.map((option) => (
+                                  <option
+                                    key={option.value}
+                                    value={option.value}
+                                  >
                                     {option.label}
                                   </option>
                                 ))}
@@ -1416,7 +1857,9 @@ export default function PatientPage({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => deleteRecordMutation.mutate({ id: record.id })}
+                                onClick={() =>
+                                  deleteRecordMutation.mutate({ id: record.id })
+                                }
                                 className="text-muted-foreground hover:text-red-400"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -1437,6 +1880,78 @@ export default function PatientPage({
             </CardContent>
           </Card>
         </div>
+
+        <aside className="xl:sticky xl:top-24 xl:self-start">
+          <Card className="overflow-hidden border-border bg-card shadow-[0_24px_80px_-40px_rgba(16,185,129,0.28)]">
+            <CardHeader className="border-b border-border bg-[radial-gradient(circle_at_top_right,_rgba(16,185,129,0.12),_transparent_38%)] pb-4">
+              <CardTitle className="flex items-center gap-2 text-card-foreground">
+                <Activity className="h-5 w-5 text-emerald-500" />
+                Action Bar
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Quick actions for visits, medications, and patient documents.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4">
+              <Button
+                className="w-full justify-start bg-emerald-600 hover:bg-emerald-500"
+                onClick={() => {
+                  setEditingVisitId(null);
+                  setVisitDiagnosis("");
+                  setVisitNotes("");
+                  setVisitDate(getDefaultVisitDate());
+                  setShowVisitDialog(true);
+                }}
+              >
+                <Stethoscope className="mr-2 h-4 w-4" />
+                New Visit
+              </Button>
+              <Button
+                className="w-full justify-start bg-teal-600 hover:bg-teal-500"
+                onClick={() => {
+                  setMedSearchQuery(medName);
+                  setShowMedicationResults(false);
+                  setShowMedDialog(true);
+                }}
+              >
+                <Pill className="mr-2 h-4 w-4" />
+                Add Medication
+              </Button>
+              {/* <Button
+                className="w-full justify-start bg-blue-600 hover:bg-blue-500"
+                onClick={() => openRecordDialogForFamily("general")}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Upload General Record
+              </Button> */}
+              <Button
+                variant="outline"
+                className="w-full justify-start border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                onClick={() => openRequestDialogForFamily("bon_de_labo")}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                BON DE LABO
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start border-sky-300 text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/40"
+                onClick={() => openRequestDialogForFamily("bon_de_radio")}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                BON DE RADIO
+              </Button>
+              <div className="my-2 border-t border-border" />
+              <Button
+                variant="outline"
+                className="w-full justify-start border-border text-foreground hover:bg-muted"
+                onClick={handleDownloadPrescription}
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                Medical Prescription
+              </Button>
+            </CardContent>
+          </Card>
+        </aside>
       </div>
     </div>
   );
